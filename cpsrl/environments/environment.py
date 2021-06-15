@@ -1,54 +1,56 @@
-from cpsrl.environments.custom.continuous_cartpole import CartPole
-from cpsrl.environments.custom.continuous_mountaincar import MountainCar
-import gym
+from typing import List, Tuple
+from abc import ABC, abstractmethod
+
+import numpy as np
+
+# =============================================================================
+# Base environment class
+# =============================================================================
 
 
-__all__ = ['Environment']
+class Environment(ABC):
 
-
-class Environment:
-
-    custom_envs = {'MountainCar' : MountainCar,
-                   'CartPole'    : CartPole}
-
-    def __init__(self,
-                 name,
-                 sub_sampling_factor=1):
-
-        if name in self.custom_envs:
-            self.env = self.custom_envs[name]()
-
-        else:
-            self.env = gym.make(name)
-
-        self.env.reset()
+    def __init__(self, horizon: int, sub_sampling_factor: int = 1):
+        self.horizon = horizon
         self.sub_sampling_factor = sub_sampling_factor
 
+        self.timestep = 0
 
-    def reset(self):
+    @abstractmethod
+    def reset(self) -> np.ndarray:
+        pass
 
-        self.env.reset()
+    @property
+    def state(self) -> np.ndarray:
+        raise NotImplementedError
 
-        return self.env.state
+    @property
+    def action_space(self) -> List[Tuple[float, float]]:
+        raise NotImplementedError
 
+    @property
+    def done(self) -> bool:
+        return self.timestep >= self.horizon
 
-    def step(self, action):
+    @abstractmethod
+    def step_dynamics(self, state: np.ndarray, action: np.ndaray) -> np.ndarray:
+        pass
 
-        state = self.env.state.copy()
-        
+    @abstractmethod
+    def get_reward(self,
+                   state: np.ndarray,
+                   action: np.ndaray,
+                   next_state: np.ndarray) -> np.ndarray:
+        pass
+
+    def step(self, action: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        state = self.state
+        next_state = None
+
         for i in range(self.sub_sampling_factor):
-            
-            self.env.step(action)
+            next_state = self.step_dynamics(state, action)
+            state = next_state
 
-        next_state = self.env.state.copy()
-
-        return state, action, next_state
-
-
-    def render(self):
-        self.env.render()
-
-
-    def close(self):
-        self.env.close()
-
+        reward = self.get_reward(self.state, action, next_state)
+        self.timestep += 1
+        return next_state, reward
