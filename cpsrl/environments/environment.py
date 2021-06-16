@@ -15,13 +15,15 @@ class Environment(ABC):
         self.sub_sampling_factor = sub_sampling_factor
 
         self.timestep = 0
+        self.state = None
+        self.reset()
 
     @abstractmethod
     def reset(self) -> np.ndarray:
         pass
 
     @property
-    def state(self) -> np.ndarray:
+    def state_space(self) -> List[Tuple[float, float]]:
         raise NotImplementedError
 
     @property
@@ -33,13 +35,13 @@ class Environment(ABC):
         return self.timestep >= self.horizon
 
     @abstractmethod
-    def step_dynamics(self, state: np.ndarray, action: np.ndaray) -> np.ndarray:
+    def step_dynamics(self, state: np.ndarray, action: np.ndarray) -> np.ndarray:
         pass
 
     @abstractmethod
     def get_reward(self,
                    state: np.ndarray,
-                   action: np.ndaray,
+                   action: np.ndarray,
                    next_state: np.ndarray) -> np.ndarray:
         pass
 
@@ -52,5 +54,8 @@ class Environment(ABC):
             state = next_state
 
         reward = self.get_reward(self.state, action, next_state)
+        
         self.timestep += 1
+        self.state = next_state
+
         return next_state, reward

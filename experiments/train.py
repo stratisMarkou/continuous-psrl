@@ -14,14 +14,13 @@ parser.add_argument("agent", type=str, default="GPPSRL", help="Agent name.")
 # Number of episodes to observe
 parser.add_argument("num_episodes", type=int, help="Number of episodes to play for.")
 
-# Environment parameters (for dynamics and rewards)
-parser.add_argument("--env_params")
-
-# Agent parameters
-parser.add_argument("--agent_params")
+# # Environment parameters (for dynamics and rewards)
+# parser.add_argument("--env_params")
+#
+# # Agent parameters
+# parser.add_argument("--agent_params")
 
 args = parser.parse_args()
-
 
 # =============================================================================
 # Helper for training one episode
@@ -50,8 +49,8 @@ def play_episode(agent, environment):
 # Training loop
 # =============================================================================
 
-env = MountainCar(reward_mean=0, reward_scale=0.5)
-agent = RandomAgent(env.action_space)
+env = MountainCar()
+agent = RandomAgent(action_space=env.action_space)
 
 # For each episode
 for i in range(args.num_episodes):
@@ -70,4 +69,3 @@ for i in range(args.num_episodes):
 # =============================================================================
 # Storing agents
 # =============================================================================
-
