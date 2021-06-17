@@ -139,8 +139,6 @@ for i in range(args.num_episodes):
         f.write(json.dumps({"Episode": i, "Return": cumulative_reward}))
         f.write("\n")
 
-raise ValueError("Show me!")
-
 # =============================================================================
 # Storing agents
 # =============================================================================
