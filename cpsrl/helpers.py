@@ -1,6 +1,40 @@
 from cpsrl.errors import ShapeError
 
 
+# ==============================================================================
+# Permissible space checker
+# ==============================================================================
+
+def check_admissible(array, admissible_box):
+    """
+    Takes in a one-dimensional array and a list of 2-long tuples representing an
+    admissible box and checks that the entries are in the admissible box,
+    raising an error if
+
+        not admissible_box[i][0] <= array[i] <= admissible_box[i][1]
+
+    :param array:
+    :param admissible_box:
+    :return:
+    """
+
+    # Check whether array and admissible box have the same number of dimensions
+    if (len(array.shape) != 1) or (array.shape[0] != len(admissible_box)):
+        raise ShapeError(f"Array shape {array.shape} and admissible box "
+                         f"with {len(admissible_box)} are incompatible.")
+
+    check = all([a1 <= a <= a2 for a, (a1, a2) in zip(array, admissible_box)])
+
+    if not check:
+        raise ShapeError(f"Array shape {array.shape} and admissible box "
+                         f"with {len(admissible_box)} are incompatible.")
+
+
+# ==============================================================================
+# Shape checker
+# ==============================================================================
+
+
 def check_shape(arrays, shapes, shape_dict=None, keep_dict=False):
     
     if (type(arrays) in [list, tuple]) and \

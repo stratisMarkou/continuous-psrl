@@ -25,3 +25,11 @@ class Policy:
     @abstractmethod
     def __call__(self, action: tf.Tensor) -> tf.Tensor:
         pass
+
+
+# ==============================================================================
+# Random policy
+# ==============================================================================
+
+class RandomPolicy(Policy):
+    pass
