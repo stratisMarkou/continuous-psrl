@@ -1,15 +1,32 @@
-from typing import List
-from cpsrl.errors import ShapeError
+import os
+import sys
+import random
+
+from typing import List, Tuple, Sequence, Generator, Union, Optional
+from collections import namedtuple
 
 import numpy as np
 import tensorflow as tf
+
+from cpsrl.errors import ShapeError
+
+# ==============================================================================
+# Custom types
+# ==============================================================================
+
+ArrayOrTensor = Union[np.ndarray, tf.Tensor]
+ArrayType = Union[np.ndarray, Sequence[np.ndarray]]
+ShapeType = Union[Tuple, Sequence[Tuple]]
+ArrayOrArrayDict = Union[ArrayType, Tuple[ArrayType, dict]]
+
+Transition = namedtuple("Transition", ("obs", "action", "reward", "next_obs"))
 
 
 # ==============================================================================
 # Helper for converting episode to list of tensors
 # ==============================================================================
 
-def convert_episode_to_tensors(episode: List[Transition], dtype):
+def convert_episode_to_tensors(episode: List[Transition], dtype: tf.dtype):
 
     episode = list(zip(episode))
 
@@ -43,7 +60,8 @@ def convert_episode_to_tensors(episode: List[Transition], dtype):
 # Permissible space checker
 # ==============================================================================
 
-def check_admissible(array, admissible_box):
+def check_admissible(array: ArrayOrTensor,
+                     admissible_box: List[(float, float)]):
     """
     Takes in a one-dimensional array and a list of 2-long tuples representing an
     admissible box and checks that the entries are in the admissible box,
@@ -73,7 +91,10 @@ def check_admissible(array, admissible_box):
 # ==============================================================================
 
 
-def check_shape(arrays, shapes, shape_dict=None, keep_dict=False):
+def check_shape(arrays: ArrayType,
+                shapes: ShapeType,
+                shape_dict: Optional[dict] = None,
+                keep_dict: bool = False) -> ArrayOrArrayDict:
     
     if (type(arrays) in [list, tuple]) and \
        (type(shapes) in [list, tuple]):
@@ -94,14 +115,15 @@ def check_shape(arrays, shapes, shape_dict=None, keep_dict=False):
         
         else:
             return arrays
-            
-    
+
     else:
         return _check_shape(arrays, shapes)[0]
-        
 
 
-def _check_shape(array, shape, shape_dict=None):
+def _check_shape(array: np.ndarray,
+                 shape: Tuple,
+                 shape_dict: Optional[dict] = None
+                 ) -> Union[np.ndarray, Tuple[np.ndarray, dict]]:
     
     array_shape = array.shape
     check_string_names = shape_dict is not None
@@ -140,3 +162,54 @@ def _check_shape(array, shape, shape_dict=None):
     
     else:
         return array
+
+
+# ==============================================================================
+# Seed management
+# ==============================================================================
+
+
+def set_seed(seed: int) -> Generator:
+    """
+    Sets the global random seed and returns a generator for instantiating
+    new RNGs. Useful to provide policies, envs, etc. with their own RNG.
+    """
+    np.random.seed(seed)
+    random.seed(seed)
+    tf.random.set_seed(seed)
+
+    return RNG(seed)
+
+
+def RNG(seed: int):
+    """Generates independent numpy RNGs."""
+    sub_seed = 0
+    while True:
+        sub_seed += 1
+        yield np.random.Generator(np.random.Philox(key=seed + sub_seed))
+
+
+# ==============================================================================
+# Logger
+# ==============================================================================
+
+
+class Logger(object):
+    """A simple logger."""
+
+    def __init__(self, directory: str, exp_name: str):
+
+        self.terminal = sys.stdout
+        self.directory = directory
+        self.exp_name = exp_name
+
+    def write(self, message):
+
+        self.terminal.write(message)
+        log_filename = os.path.join(self.directory, f"{self.exp_name}.txt")
+
+        with open(log_filename, "a") as f:
+            f.write(message)
+
+    def flush(self):
+        pass

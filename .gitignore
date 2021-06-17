@@ -1,6 +1,10 @@
 # Custom ignores
 venv-psrl
-.idea
+.idea/
+models/
+data/
+results/
+logs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

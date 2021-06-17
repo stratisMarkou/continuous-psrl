@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 
 class Agent(ABC):
 
-    def __init__(self, action_space: List[Tuple[float]]):
+    def __init__(self, action_space: List[Tuple[float, float]]):
         self.action_space = action_space
 
     @abstractmethod
@@ -55,13 +55,15 @@ class Agent(ABC):
 # =============================================================================
 
 class RandomAgent(Agent):
+    def __init__(self,
+                 action_space: List[Tuple[float, float]],
+                 rng: np.random.Generator):
+
+        super().__init__(action_space)
+        self.rng = rng
 
     def act(self, state: np.ndarray) -> np.ndarray:
-
-        action = np.array([np.random.uniform(low, high) \
-                           for low, high in self.action_space])
-
-        return action
+        return np.array([self.rng.uniform(lo, hi) for lo, hi in self.action_space])
 
     def observe(self, episode: List[Tuple]):
         pass

@@ -10,8 +10,13 @@ import numpy as np
 
 class Environment(ABC):
 
-    def __init__(self, horizon: int, sub_sampling_factor: int = 1):
+    def __init__(self,
+                 horizon: int,
+                 rng: np.random.Generator,
+                 sub_sampling_factor: int = 1):
+
         self.horizon = horizon
+        self.rng = rng
         self.sub_sampling_factor = sub_sampling_factor
 
         self.timestep = 0
@@ -54,7 +59,7 @@ class Environment(ABC):
             state = next_state
 
         reward = self.get_reward(self.state, action, next_state)
-        
+
         self.timestep += 1
         self.state = next_state
 

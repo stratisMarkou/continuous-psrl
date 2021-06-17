@@ -1,7 +1,8 @@
 from typing import List, Tuple, Callable
+from abc import ABC
 
-from cpsrl.models.gp import VFEGPStack
-from cpsrl.helpers import check_shape, convert_episode_to_tensors
+from cpsrl.models.gp import VFEGP, VFEGPStack
+from cpsrl.helpers import *
 from cpsrl.policies.policies import Policy
 
 import tensorflow as tf
@@ -15,34 +16,26 @@ class GPPSRLAgent(ABC):
 
     def __init__(self,
                  dynamics_model: VFEGPStack,
-                 rewards_model: VFEGPStack,
+                 rewards_model: VFEGP,
                  policy: Policy,
-                 state_space: List[Tuple[float]],
-                 action_space: List[Tuple[float]],
                  dtype: tf.dtype):
 
         self.dynamics_model = dynamics_model
         self.rewards_model = rewards_model
         self.policy = policy
 
-        self.state_space = state_space
-        self.S = len(state_space)
-        self.action_space = action_space
-        self.A = len(action_space)
-
         self.dtype = dtype
 
-    def act(self, state: np.ndarray):
+    def act(self, state: ArrayOrTensor) -> tf.Tensor:
 
-        # Check state shape is (S,)
-        check_shape(state, (len(self.state_space),))
+        state = tf.convert_to_tensor(state, dtype=self.dtype)
 
         return self.policy(state)
 
     def observe(self, episode: List[Tuple]):
 
         # Convert episode to tensors, to update the models' training data
-        sa, s_, sas_, r = convert_episode_to_tensors(episode)
+        sa, s_, sas_, r = convert_episode_to_tensors(episode, dtype=self.dtype)
 
         # Update the models' training data
         self.dynamics_model.add_training_data(sa, s_)
@@ -80,11 +73,7 @@ class GPPSRLAgent(ABC):
         :return:
         """
 
-        check_shape(s0, ('R', self.S))
+        check_shape(s0, ('R', 'S'))
 
-
-
-        for i in horizon:
+        for i in range(horizon):
             pass
-
-        pass
