@@ -1,11 +1,14 @@
+from typing import Tuple, List
+
 import tensorflow as tf
 
-class GPPSRLAgent:
-    
-    def __init__(self):
-        pass
-    
-    
+from cpsrl.agents import Agent
+
+
+class GPPSRLAgent(Agent):
+    def __init__(self, action_space: List[Tuple[float, float]]):
+        super().__init__(action_space=action_space)
+
     def rollout(self, dynamics_sample, rewards_sample, horizon):
         
         initial_states = None
@@ -30,7 +33,6 @@ class GPPSRLAgent:
             
             actions.append(a)
             rewards.append(r)
-            
-    
+
     def optimise_policy(self):
         pass

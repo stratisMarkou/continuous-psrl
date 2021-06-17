@@ -1,7 +1,22 @@
+import os
+import sys
+import json
+import random
+import logging
+from typing import Tuple, Sequence, Generator, Union, Optional
+
+import numpy as np
+
 from cpsrl.errors import ShapeError
 
+ArrayType = Union[np.ndarray, Sequence[np.ndarray]]
+ShapeType = Union[Tuple, Sequence[Tuple]]
 
-def check_shape(arrays, shapes, shape_dict=None, keep_dict=False):
+
+def check_shape(arrays: ArrayType,
+                shapes: ShapeType,
+                shape_dict: Optional[dict] = None,
+                keep_dict: bool = False) -> Union[ArrayType, Tuple[ArrayType, dict]]:
     
     if (type(arrays) in [list, tuple]) and \
        (type(shapes) in [list, tuple]):
@@ -22,14 +37,15 @@ def check_shape(arrays, shapes, shape_dict=None, keep_dict=False):
         
         else:
             return arrays
-            
-    
+
     else:
         return _check_shape(arrays, shapes)[0]
-        
 
 
-def _check_shape(array, shape, shape_dict=None):
+def _check_shape(array: np.ndarray,
+                 shape: Tuple,
+                 shape_dict: Optional[dict] = None
+                 ) -> Union[np.ndarray, Tuple[np.ndarray, dict]]:
     
     array_shape = array.shape
     check_string_names = shape_dict is not None
@@ -68,3 +84,50 @@ def _check_shape(array, shape, shape_dict=None):
     
     else:
         return array
+
+
+def set_seed(seed: int) -> Generator:
+    """
+    Sets the global random seed and returns a generator for instantiating
+    new RNGs. Useful to provide policies, envs, etc. with their own RNG.
+    """
+    np.random.seed(seed)
+    random.seed(seed)
+    # TODO: set tf random seed
+
+    return RNG(seed)
+
+
+def RNG(seed: int):
+    """Generates independent numpy RNGs."""
+    sub_seed = 0
+    while True:
+        sub_seed += 1
+        yield np.random.Generator(np.random.Philox(key=seed + sub_seed))
+
+
+def get_logger() -> logging.Logger:
+    """Returns the logger."""
+    return logging.getLogger("logger")
+
+
+def setup_logger(log_level: int, directory: str, exp_name: str) -> logging.Logger:
+    """Sets up a simple logger."""
+    logger = get_logger()
+    logger.setLevel(log_level)
+    formatter = logging.Formatter(
+        "%(asctime)s.%(msecs)03d " "%(levelname)s: %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+    ch = logging.StreamHandler(stream=sys.stdout)
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+
+    path = os.path.join(directory, exp_name + ".log")
+    fh = logging.FileHandler(path, mode="w")
+    fh.setFormatter(formatter)
+    logger.addHandler(fh)
+
+    logger.propagate = False
+    return logger
