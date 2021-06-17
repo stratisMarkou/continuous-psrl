@@ -6,6 +6,7 @@ import logging
 from typing import Tuple, Sequence, Generator, Union, Optional
 
 import numpy as np
+import tensorflow as tf
 
 from cpsrl.errors import ShapeError
 
@@ -93,7 +94,7 @@ def set_seed(seed: int) -> Generator:
     """
     np.random.seed(seed)
     random.seed(seed)
-    # TODO: set tf random seed
+    tf.random.set_seed(seed)
 
     return RNG(seed)
 
