@@ -6,6 +6,7 @@ from cpsrl.environments.environment import Environment
 from cpsrl.errors import EnvironmentError
 from cpsrl.helpers import check_shape
 
+
 # =============================================================================
 # MountainCar environment
 # =============================================================================
