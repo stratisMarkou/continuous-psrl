@@ -1,8 +1,6 @@
 import os
 import sys
-import json
 import random
-import logging
 from typing import Tuple, Sequence, Generator, Union, Optional
 
 import numpy as np
@@ -106,28 +104,18 @@ def RNG(seed: int):
         yield np.random.Generator(np.random.Philox(key=seed + sub_seed))
 
 
-def get_logger() -> logging.Logger:
-    """Returns the logger."""
-    return logging.getLogger("logger")
+class Logger(object):
+    """A simple logger."""
+    def __init__(self, directory: str, exp_name: str):
+        self.terminal = sys.stdout
+        self.directory = directory
+        self.exp_name = exp_name
 
+    def write(self, message):
+        self.terminal.write(message)
+        log_filename = os.path.join(self.directory, f"{self.exp_name}.txt")
+        with open(log_filename, "a") as f:
+            f.write(message)
 
-def setup_logger(log_level: int, directory: str, exp_name: str) -> logging.Logger:
-    """Sets up a simple logger."""
-    logger = get_logger()
-    logger.setLevel(log_level)
-    formatter = logging.Formatter(
-        "%(asctime)s.%(msecs)03d " "%(levelname)s: %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-
-    ch = logging.StreamHandler(stream=sys.stdout)
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
-
-    path = os.path.join(directory, exp_name + ".log")
-    fh = logging.FileHandler(path, mode="w")
-    fh.setFormatter(formatter)
-    logger.addHandler(fh)
-
-    logger.propagate = False
-    return logger
+    def flush(self):
+        pass

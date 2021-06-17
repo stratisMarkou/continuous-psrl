@@ -2,13 +2,14 @@ import os
 import json
 import pickle
 import argparse
+import sys
 from typing import Tuple, List
 from collections import namedtuple
 
 from cpsrl.agents import Agent, RandomAgent, GPPSRLAgent
 from cpsrl.environments import Environment, MountainCar, CartPole
 
-from cpsrl.helpers import set_seed, setup_logger
+from cpsrl.helpers import set_seed, Logger
 
 parser = argparse.ArgumentParser()
 
@@ -46,13 +47,6 @@ parser.add_argument("--model_dir",
                     type=str,
                     default="models",
                     help="Directory for storing models.")
-
-parser.add_argument(
-        "--log_level",
-        type=str,
-        choices=["INFO", "DEBUG"],
-        default="INFO",
-        help="Level of logging.")
 
 # # Environment parameters (for dynamics and rewards)
 # parser.add_argument("--env_params")
@@ -96,8 +90,9 @@ exp_name = f"{args.agent}_{args.env}_{args.seed}"
 for dir in [args.log_dir, args.results_dir, args.data_dir, args.model_dir]:
     os.makedirs(dir, exist_ok=True)
 
-logger = setup_logger(args.log_level, directory=args.log_dir, exp_name=exp_name)
-logger.debug(vars(args))
+logger = Logger(directory=args.log_dir, exp_name=exp_name)
+sys.stdout, sys.stderr = logger, logger
+print(vars(args))
 
 # Set up env
 env_rng = next(rng_seq)
@@ -133,7 +128,7 @@ for i in range(args.num_episodes):
     # Train agent models and/or policy
     agent.update()
 
-    logger.info(f'Episode {i} | Return: {cumulative_reward:.3f}')
+    print(f'Episode {i} | Return: {cumulative_reward:.3f}')
 
     # Save episode
     with open(os.path.join(args.data_dir, exp_name + f"_ep-{i}.pkl"), mode="wb") as f:
@@ -143,6 +138,8 @@ for i in range(args.num_episodes):
     with open(os.path.join(args.results_dir, exp_name + ".txt"), mode="a") as f:
         f.write(json.dumps({"Episode": i, "Return": cumulative_reward}))
         f.write("\n")
+
+raise ValueError("Show me!")
 
 # =============================================================================
 # Storing agents
