@@ -18,7 +18,7 @@ class GPPSRLAgent(ABC):
                  dynamics_model: VFEGPStack,
                  rewards_model: VFEGP,
                  policy: Policy,
-                 dtype: tf.dtype):
+                 dtype: tf.DType):
 
         self.dynamics_model = dynamics_model
         self.rewards_model = rewards_model
