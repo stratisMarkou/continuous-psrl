@@ -93,11 +93,11 @@ class EQ(tf.keras.Model):
 
         phi = tf.random.uniform(minval=0.,
                                 maxval=(2 * np.pi),
-                                shape=(num_features, x_dim),
+                                shape=(num_features, 1),
                                 dtype=self.dtype)
 
         def rff(x):
-        
+            
             features = tf.cos(tf.einsum('fd, nd -> fn', omega, x) + phi)
             features = (2 / num_features) ** 0.5 * features * self.coeff
 

@@ -12,13 +12,45 @@ from cpsrl.helpers import check_shape
 
 class VFEGPStack(tf.keras.Model):
     
-    def __init__(self, vfe_gps, name='vfegp_stack'):
-        pass
+    def __init__(self, vfe_gps, dtype, name='gp_stack', **kwargs):
+        
+        super().__init__(name=name, dtype=dtype, **kwargs)
+        
+        self.vfe_gps = []
+        
+        for vfe_gp in vfe_gps:
+            self.vfe_gps.append(vfe_gp)
     
     
     def add_training_data(self, x_train, y_train):
-        pass
-
+        
+        check_shape([x_train, y_train], [('N', '-1'), ('N', '-1')])
+        
+        for i, vfe_gp in enumerate(self.vfe_gps):
+            vfe_gp.add_training_data(x_train, y_train[:, i:i+1])
+    
+    
+    def sample_posterior(self, num_features):
+        
+        post_samples = [vfe_gp.sample_posterior(num_features=num_features) \
+                        for vfe_gp in self.vfe_gps]
+        
+        def post_sample(x, add_noise):
+            
+            # Check shape of input against training
+            check_shape([x, self.vfe_gps[0].x_train],
+                        [('N1', 'D'), ('N2', 'D')])
+            
+            samples = [sample(x, add_noise) for sample in post_samples]
+            
+            return tf.stack(samples, axis=1)
+            
+        return post_sample
+    
+    
+    def free_energy(self):
+        return tf.reduce_sum([vfe_gp.free_energy() for vfe_gp in self.vfe_gps])
+    
 
 # ==============================================================================
 # Variational Sparse Gaussian Process
@@ -55,7 +87,7 @@ class VFEGP(tf.keras.Model):
         super().__init__(name=name, dtype=dtype, **kwargs)
         
         # Check x_train and y_train have compatible shapes
-        check_shape([x_train, y_train], [('N', 'D'), ('N', 1)])
+        check_shape([x_train, y_train], [('N', 'D'), ('N', '1')])
         
         # Set training data and inducing point initialisation
         self.x_train = tf.zeros(shape=(0, x_train.shape[1]), dtype=dtype)
@@ -103,7 +135,7 @@ class VFEGP(tf.keras.Model):
         
         # Check x_train and y_train have compatible shapes
         check_shape([self.x_train, x_train, self.y_train, y_train],
-                    [('N1', 'D'), ('N2', 'D'), ('N1', 1), ('N2', 1)])
+                    [('N1', 'D'), ('N2', 'D'), ('N1', '1'), ('N2', '1')])
         
         # Concatenate observed data and new data
         self.x_train = tf.concat([self.x_train, x_train], axis=0)
@@ -120,6 +152,7 @@ class VFEGP(tf.keras.Model):
         # Number of training points
         N = self.y_train.shape[0]
         M = self.x_ind.shape[0]
+        K = x_pred.shape[0]
         
         # Compute covariance terms
         K_ind_ind = self.cov(self.x_ind, self.x_ind, epsilon=1e-9)
@@ -127,7 +160,7 @@ class VFEGP(tf.keras.Model):
         K_ind_train = self.cov(self.x_ind, self.x_train)
         K_pred_ind = self.cov(x_pred, self.x_ind)
         K_ind_pred = self.cov(self.x_ind, x_pred)
-        K_pred_pred_diag = self.cov(x_pred, x_pred, diag=True)
+        K_pred_pred = self.cov(x_pred, x_pred)
         
         # Compute intermediate matrices using Cholesky for numerical stability
         L, U, A, B, B_chol = self.compute_intermediate_matrices(K_ind_ind,
@@ -141,15 +174,15 @@ class VFEGP(tf.keras.Model):
                                           lower=False)
         mean = tf.matmul(K_pred_ind / self.noise ** 2, beta)[:, 0]
         
+        # Compute covariance
         C = tf.linalg.triangular_solve(L, K_ind_pred)
         D = tf.linalg.triangular_solve(B_chol, C)
         
-        # Compute variance
-        var = K_pred_pred_diag + self.noise ** 2
-        var = var - tf.linalg.diag_part(tf.matmul(C, C, transpose_a=True))
-        var = var + tf.linalg.diag_part(tf.matmul(D, D, transpose_a=True))
+        cov = K_pred_pred + self.noise ** 2 * tf.eye(K, dtype=self.dtype)
+        cov = cov - tf.matmul(C, C, transpose_a=True)
+        cov = cov + tf.matmul(D, D, transpose_a=True)
         
-        return mean, var
+        return mean, cov
         
         
     def free_energy(self):
@@ -227,16 +260,12 @@ class VFEGP(tf.keras.Model):
             # Covariance between inputs and inducing points
             K_x_ind = self.cov(x, self.x_ind)
             
-            print(K_x_ind.shape, v.shape, rff_prior(x).shape)
-            
             sample = rff_prior(x) + tf.linalg.matvec(K_x_ind, v)
                      
             if add_noise:
                 sample = sample + tf.random.normal(mean=0.,
                                                    stddev=self.noise,
                                                    shape=sample.shape)
-            
-            print(sample.shape)
             return sample
         
         return post_sample
