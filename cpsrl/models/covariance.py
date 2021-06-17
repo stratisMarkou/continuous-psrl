@@ -1,3 +1,4 @@
+from abc import abstractmethod
 from typing import List, Callable
 
 from cpsrl.helpers import check_shape
@@ -7,11 +8,33 @@ import tensorflow as tf
 
 
 # ==============================================================================
+# Base covariance class
+# ==============================================================================
+
+class Covariance(tf.keras.Model):
+
+    def __init__(self, dtype: tf.DType, name: str = 'eq', **kwargs):
+
+        super().__init__(name=name, dtype=dtype, **kwargs)
+
+    @abstractmethod
+    def __call__(self,
+                 x1: tf.Tensor,
+                 x2: tf.Tensor,
+                 diag: bool = False,
+                 epsilon: float = None) -> tf.Tensor:
+        pass
+
+    @abstractmethod
+    def sample_rff(self, num_features: int) -> Callable:
+        pass
+
+
+# ==============================================================================
 # EQ covariance
 # ==============================================================================
 
-
-class EQ(tf.keras.Model):
+class EQ(Covariance):
 
     def __init__(self, 
                  log_coeff: float,
@@ -43,7 +66,7 @@ class EQ(tf.keras.Model):
                  x2: tf.Tensor,
                  diag: bool = False,
                  epsilon: float = None) -> tf.Tensor:
-        
+
         # Check input shapes
         check_shape([x1, x2, self.log_scales], [(-1, 'D'), (-1, 'D'), ('D',)])
 
@@ -100,3 +123,4 @@ class EQ(tf.keras.Model):
             return tf.einsum('f, fn -> n', weights, features)
 
         return rff
+

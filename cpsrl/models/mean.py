@@ -1,13 +1,30 @@
+from abc import abstractmethod
+
 import tensorflow as tf
 
 from cpsrl.helpers import check_shape
 
 
 # ==============================================================================
+# Base mean class
+# ==============================================================================
+
+class Mean(tf.keras.Model):
+
+    def __init__(self, dtype: tf.DType, name='mean'):
+
+        super().__init__(name=name, dtype=dtype)
+
+    @abstractmethod
+    def __call__(self, x: tf.Tensor):
+        pass
+
+
+# ==============================================================================
 # Constant mean class
 # ==============================================================================
 
-class ConstantMean(tf.keras.Model):
+class ConstantMean(Mean):
 
     def __init__(self,
                  trainable: bool,
@@ -18,7 +35,6 @@ class ConstantMean(tf.keras.Model):
         
         self.constant = tf.Variable(tf.constant(0., dtype=dtype),
                                     trainable=trainable)
-        
         
     def __call__(self, x: tf.Tensor):
 
@@ -32,7 +48,7 @@ class ConstantMean(tf.keras.Model):
 # ==============================================================================
 
 
-class LinearMean(tf.keras.Model):
+class LinearMean(Mean):
 
     def __init__(self,
                  input_dim: int,
