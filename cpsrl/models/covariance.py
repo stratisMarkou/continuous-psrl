@@ -1,15 +1,24 @@
-import tensorflow as tf
+from typing import List, Callable
+
+from cpsrl.helpers import check_shape
+
 import numpy as np
-    
-    
+import tensorflow as tf
+
+
+# ==============================================================================
+# EQ covariance
+# ==============================================================================
+
+
 class EQ(tf.keras.Model):
 
     def __init__(self, 
-                 log_coeff,
-                 log_scales,
-                 trainable,
-                 dtype,
-                 name='eq',
+                 log_coeff: float,
+                 log_scales: List[float],
+                 trainable: bool,
+                 dtype: tf.DType,
+                 name: str = 'eq',
                  **kwargs):
         
         super().__init__(name=name, dtype=dtype, **kwargs)
@@ -23,64 +32,49 @@ class EQ(tf.keras.Model):
         log_scales = tf.reshape(log_scales, (-1,))
         
         # Set input dimensionality
-        self.dim = log_scales.shape[0]
+        self.input_dim = log_scales.shape[0]
         
-        # Set EQ parameters
-        self.log_scales = tf.Variable(log_scales, trainable=trainable)
+        # Set EQ coefficient and lengthscales
         self.log_coeff = tf.Variable(log_coeff, trainable=trainable)
-        
-        
+        self.log_scales = tf.Variable(log_scales, trainable=trainable)
+
     def __call__(self,
-                 x1,
-                 x2,
-                 diag=False,
-                 epsilon=None):
+                 x1: tf.Tensor,
+                 x2: tf.Tensor,
+                 diag: bool = False,
+                 epsilon: float = None) -> tf.Tensor:
         
-        # Convert to tensors
-        x1 = tf.convert_to_tensor(x1, dtype=self.dtype)
-        x2 = tf.convert_to_tensor(x2, dtype=self.dtype)
+        # Check input shapes
+        check_shape([x1, x2, self.log_scales], [(-1, 'D'), (-1, 'D'), ('D',)])
 
-        # Get vector of lengthscales
-        scales = self.scales
-        
-        # If calculating full covariance, add dimensions to broadcast
-        if not diag:
-
-            x1 = x1[:, None, :]
-            x2 = x2[None, :, :]
-
-            scales = self.scales[None, None, :] ** 2
+        # Add dimensions to broadcast
+        x1 = x1[:, None, :]
+        x2 = x2[None, :, :]
 
         # Compute quadratic, exponentiate and multiply by coefficient
-        quad = - 0.5 * (x1 - x2) ** 2 / scales
+        quad = - 0.5 * ((x1 - x2) / self.scales[None, None, :]) ** 2
         quad = tf.reduce_sum(quad, axis=-1)
         eq_cov = self.coeff ** 2 * tf.exp(quad)
-        
+
         # Add jitter for invertibility
         if epsilon is not None:
             eq_cov = eq_cov + epsilon * tf.eye(eq_cov.shape[0], 
                                                dtype=self.dtype)
 
         return eq_cov
-        
-    
+
     @property
-    def scales(self):
+    def scales(self) -> tf.Tensor:
         return tf.math.exp(self.log_scales)
     
-    
     @property
-    def coeff(self):
+    def coeff(self) -> tf.Tensor:
         return tf.math.exp(self.log_coeff)
-    
-    
-    def sample_rff(self, num_features):
 
-        # Dimension of data space
-        x_dim = self.scales.shape[0]
-        omega_shape = (num_features, x_dim)
+    def sample_rff(self, num_features: int) -> Callable:
 
-        omega = tf.random.normal(shape=(num_features, x_dim), dtype=self.dtype)
+        omega = tf.random.normal(shape=(num_features, self.input_dim),
+                                 dtype=self.dtype)
 
         # Scale omegas by lengthscale
         omega = omega / self.scales[None, :]
@@ -97,9 +91,11 @@ class EQ(tf.keras.Model):
                                 dtype=self.dtype)
 
         def rff(x):
+
+            check_shape(x, (-1, self.input_dim))
             
             features = tf.cos(tf.einsum('fd, nd -> fn', omega, x) + phi)
-            features = (2 / num_features) ** 0.5 * features * self.coeff
+            features = (2 / num_features) ** 0.5 * self.coeff * features
 
             return tf.einsum('f, fn -> n', weights, features)
 
