@@ -1,4 +1,42 @@
+from typing import List
 from cpsrl.errors import ShapeError
+
+import numpy as np
+import tensorflow as tf
+
+
+# ==============================================================================
+# Helper for converting episode to list of tensors
+# ==============================================================================
+
+def convert_episode_to_tensors(episode: List[Transition], dtype):
+
+    episode = list(zip(episode))
+
+    episode_sa = []
+    episode_s_ = []
+    episode_sas_ = []
+    episode_r = []
+
+    # Check shapes and append data to arrays
+    for s, a, s_, r in episode:
+
+        # Check the shape of the states, actions and rewards
+        check_shape([s, a, s_, r], [('S',), ('A',), ('S',), (1,)])
+
+        # Append states, actions and rewards to lists of observed data
+        episode_sa.append(np.concatenate([s, a]))
+        episode_s_.append(s_)
+
+        episode_sas_.append(np.concatenate([s, a, s_]))
+        episode_r.append(r)
+
+    episode_sa = tf.convert_to_tensor(episode_sa, dtype=dtype)
+    episode_s_ = tf.convert_to_tensor(episode_s_, dtype=dtype)
+    episode_sas_ = tf.convert_to_tensor(episode_sas_, dtype=dtype)
+    episode_r = tf.convert_to_tensor(episode_r, dtype=dtype)
+
+    return episode_sa, episode_s_, episode_sas_, episode_r
 
 
 # ==============================================================================
@@ -20,14 +58,14 @@ def check_admissible(array, admissible_box):
 
     # Check whether array and admissible box have the same number of dimensions
     if (len(array.shape) != 1) or (array.shape[0] != len(admissible_box)):
-        raise ShapeError(f"Array shape {array.shape} and admissible box "
-                         f"with {len(admissible_box)} are incompatible.")
+        raise ShapeError(f"Array shape {array.shape} and admissible box with "
+                         f"length {len(admissible_box)} are incompatible.")
 
     check = all([a1 <= a <= a2 for a, (a1, a2) in zip(array, admissible_box)])
 
     if not check:
-        raise ShapeError(f"Array shape {array.shape} and admissible box "
-                         f"with {len(admissible_box)} are incompatible.")
+        raise ShapeError(f"Array shape {array.shape} not in admissible box "
+                         f"{admissible_box}.")
 
 
 # ==============================================================================
