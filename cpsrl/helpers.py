@@ -26,7 +26,7 @@ Transition = namedtuple("Transition", ("obs", "action", "reward", "next_obs"))
 # Helper for converting episode to list of tensors
 # ==============================================================================
 
-def convert_episode_to_tensors(episode: List[Transition], dtype: tf.dtype):
+def convert_episode_to_tensors(episode: List[Transition], dtype: tf.DType):
 
     episode = list(zip(episode))
 
@@ -61,7 +61,7 @@ def convert_episode_to_tensors(episode: List[Transition], dtype: tf.dtype):
 # ==============================================================================
 
 def check_admissible(array: ArrayOrTensor,
-                     admissible_box: List[(float, float)]):
+                     admissible_box: List[Tuple[float, float]]):
     """
     Takes in a one-dimensional array and a list of 2-long tuples representing an
     admissible box and checks that the entries are in the admissible box,
