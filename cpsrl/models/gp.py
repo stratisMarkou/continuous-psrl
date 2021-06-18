@@ -59,6 +59,9 @@ class VFEGPStack(tf.keras.Model):
 
             post_sample(x: tf.Tensor, add_noise: bool).
 
+        Under the hood, this Callable is a list of Callables produced using
+        vfe_gp.sample_posterior on each VFEGP in the stack.
+
         The *x* argument is assumed to be a tf.Tensor of shape (N, D),
         where D is the input dimension of the VFEGP. If *add_noise* is True,
         calling the posterior sample adds noise to its output.
@@ -218,24 +221,35 @@ class VFEGP(tf.keras.Model):
         """
         return tf.math.exp(self.log_noise)
 
-    def post_pred(self, x_pred: tf.Tensor):
+    def post_pred(self, x_pred: tf.Tensor) -> List[tf.Tensor, tf.Tensor]:
+        """
+        Computes the predictive posterior of the VFE GP model in a
+        numerically stable way, returning the mean vector and covariance
+        matrix of the predictive corresponding to the inputs *x_ind*.
+
+        For more details on the numerically stable implementation see:
+        https://gpflow.readthedocs.io/en/master/notebooks/theory/SGPR_notes.html
+
+        :param x_pred: prediction locations, shape (N, D)
+        :return:
+        """
+
+        # Check input tensor shape
+        check_shape([x_pred, self.x_train], [('K', 'D'), ('N', 'D')])
         
         # Number of training points
-        N = self.y_train.shape[0]
-        M = self.x_ind.shape[0]
         K = x_pred.shape[0]
         
         # Compute covariance terms
         K_ind_ind = self.cov(self.x_ind, self.x_ind, epsilon=1e-9)
-        K_train_ind = self.cov(self.x_train, self.x_ind)
         K_ind_train = self.cov(self.x_ind, self.x_train)
         K_pred_ind = self.cov(x_pred, self.x_ind)
         K_ind_pred = self.cov(self.x_ind, x_pred)
         K_pred_pred = self.cov(x_pred, x_pred)
         
         # Compute intermediate matrices using Cholesky for numerical stability
-        L, U, A, B, B_chol = self.compute_intermediate_matrices(K_ind_ind,
-                                                                K_ind_train)
+        L, U, A, B, B_chol = self.compute_helper_matrices(K_ind_ind,
+                                                          K_ind_train)
         
         # Compute mean
         diff = self.y_train # - self.mean(self.x_train)[:, None]
@@ -255,21 +269,27 @@ class VFEGP(tf.keras.Model):
         
         return mean, cov
         
-    def free_energy(self):
+    def free_energy(self) -> tf.Tensor:
+        """
+        Computes the Variational Free Energy in a numerically stable way.
+
+        For more details on the numerically stable implementation see:
+        https://gpflow.readthedocs.io/en/master/notebooks/theory/SGPR_notes.html
+
+        :return:
+        """
         
         # Number of training points and inducing points
         N = self.y_train.shape[0]
-        M = self.x_ind.shape[0]
-        
+
         # Compute covariance terms
         K_ind_ind = self.cov(self.x_ind, self.x_ind, epsilon=1e-9)
-        K_train_ind = self.cov(self.x_train, self.x_ind)
         K_ind_train = self.cov(self.x_ind, self.x_train)
         K_train_train_diag = self.cov(self.x_train, self.x_train, diag=True)
         
         # Compute intermediate matrices using Cholesky for numerical stability
-        L, U, A, B, B_chol = self.compute_intermediate_matrices(K_ind_ind,
-                                                                K_ind_train)
+        L, U, A, B, B_chol = self.compute_helper_matrices(K_ind_ind,
+                                                          K_ind_train)
         
         # Compute log-normalising constant of the matrix
         log_pi = - N / 2 * tf.math.log(tf.constant(2 * np.pi, dtype=self.dtype))
@@ -293,9 +313,21 @@ class VFEGP(tf.keras.Model):
         
         return free_energy
         
+    def sample_posterior(self, num_features: int):
+        """
+        Produces a posterior sample, using *num_features* random fourier
+        features, returning the sample in the form of a Callable with signature:
 
-    def sample_posterior(self, num_features):
-        
+            post_sample(x: tf.Tensor, add_noise: bool).
+
+        The *x* argument is assumed to be a tf.Tensor of shape (N, D),
+        where D is the input dimension of the VFEGP. If *add_noise* is True,
+        calling the posterior sample adds noise to its output.
+
+        :param num_features:
+        :return: posterior sample as Callable
+        """
+
         # Number of inducing points
         M = self.x_ind.shape[0]
         
@@ -307,8 +339,8 @@ class VFEGP(tf.keras.Model):
         K_ind_train = self.cov(self.x_ind, self.x_train)
         
         # Compute intermediate matrices using Cholesky for numerical stability
-        L, U, A, B, B_chol = self.compute_intermediate_matrices(K_ind_ind,
-                                                                K_ind_train)
+        L, U, A, B, B_chol = self.compute_helper_matrices(K_ind_ind,
+                                                          K_ind_train)
         
         # Compute mean of VFE posterior over inducing values
         u_mean = self.noise ** -2 * \
@@ -322,11 +354,11 @@ class VFEGP(tf.keras.Model):
         u = u_mean[:, 0] + tf.matmul(u_cov_chol, rand, transpose_a=True)[:, 0]
         v = tf.linalg.cholesky_solve(L, (u - rff_prior(self.x_ind))[:, None])[:, 0]
         
-        def post_sample(x, add_noise):
-            
+        def post_sample(x: tf.Tensor, add_noise: bool) -> tf.Tensor:
+
             # Check input shape
             check_shape([self.x_train, x], [(-1, 'D'), (-1, 'D')])
-            
+
             # Covariance between inputs and inducing points
             K_x_ind = self.cov(x, self.x_ind)
             
@@ -339,9 +371,24 @@ class VFEGP(tf.keras.Model):
             return sample
         
         return post_sample
-    
-    
-    def compute_intermediate_matrices(self, K_ind_ind, K_ind_train):
+
+    def compute_helper_matrices(self,
+                                K_ind_ind: tf.Tensor,
+                                K_ind_train: tf.Tensor) -> List[tf.Tensor]:
+        """
+        Computes matrices used by other methods of this class,
+        for numerically stable calculations.
+
+        For more details on the numerically stable implementation see:
+        https://gpflow.readthedocs.io/en/master/notebooks/theory/SGPR_notes.html
+
+        :param K_ind_ind: inducing-inducing covariance matrix, shape (M, M)
+        :param K_ind_train: inducing-training covariance matrix, shape (M, M)
+        :return:
+        """
+
+        # Check shapes of covariance matrices
+        check_shape([K_ind_ind, K_ind_train], [('M', 'M'), ('M', 'N')])
         
         # Number of inducing points
         M = self.x_ind.shape[0]
