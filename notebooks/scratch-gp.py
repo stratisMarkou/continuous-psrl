@@ -182,7 +182,7 @@ N = 200
 D = 1
 
 # Set all parameters to trainable
-trainable_mean = False
+trainable_mean = True
 trainable_cov = False
 trainable_noise = True
 trainable_inducing = False
@@ -202,9 +202,9 @@ y_train = tf.random.normal(mean=0.,
                            dtype=DTYPE)
 
 # Initialise mean and covariance
-mean = ConstantMean(input_dim=D,
-                    trainable=trainable_mean,
-                    dtype=DTYPE)
+mean = LinearMean(input_dim=D,
+                  trainable=trainable_mean,
+                  dtype=DTYPE)
 
 cov = EQ(log_coeff=log_coeff,
          log_scales=log_scales,
@@ -239,22 +239,8 @@ for step in range(num_steps + 1):
     gradients = tape.gradient(loss, vfe_gp.trainable_variables)
     optimizer.apply_gradients(zip(gradients, vfe_gp.trainable_variables))
 
-import matplotlib.pyplot as plt
-
-x_pred = tf.linspace(-0.5, 2.5, 200)[:, None]
-x_pred = tf.cast(x_pred, dtype=DTYPE)
-
-mean, cov = vfe_gp.post_pred(x_pred)
-mean = tf.reshape(mean, (-1,))
-stddev = tf.linalg.diag_part(cov) ** 0.5
-
-plt.scatter(x_train[:, 0].numpy(), y_train[:, 0].numpy())
-plt.plot(x_pred[:, 0].numpy(), mean)
-plt.fill_between(x_pred[:, 0].numpy(),
-                 mean + stddev,
-                 mean - stddev,
-                 color='gray',
-                 alpha=0.3)
-plt.show()
+post_sample = vfe_gp.sample_posterior(num_features=100)
+print(vfe_gp.mean.coefficients)
+print(post_sample(x_train, add_noise=False).shape)
 
 # %%

@@ -81,7 +81,7 @@ class VFEGPStack(tf.keras.Model):
 
             samples = [sample(x, add_noise) for sample in post_samples]
             
-            return tf.stack(samples, axis=1)
+            return tf.concat(samples, axis=1)
             
         return post_sample
     
@@ -193,8 +193,7 @@ class VFEGP(tf.keras.Model):
                                          dtype=self.dtype)
             
         return x_ind
-    
-        
+
     def add_training_data(self, x_train: tf.Tensor, y_train: tf.Tensor):
         """
         Adds data to the model's training data.
@@ -211,8 +210,7 @@ class VFEGP(tf.keras.Model):
         # Concatenate observed data and new data
         self.x_train = tf.concat([self.x_train, x_train], axis=0)
         self.y_train = tf.concat([self.y_train, y_train], axis=0)
-    
-    
+
     @property
     def noise(self) -> tf.Tensor:
         """
@@ -252,14 +250,19 @@ class VFEGP(tf.keras.Model):
                                                           K_ind_train)
         
         # Compute mean
-        diff = self.y_train # - self.mean(self.x_train)[:, None]
+        prior_mean = self.mean(self.x_train)
+        check_shape([prior_mean, self.x_train, self.y_train],
+                    [('N', 1), ('N', 'D'), ('N', 1)])
+
+        # Compute posterior mean
+        diff = self.y_train - prior_mean
         beta = tf.linalg.cholesky_solve(B_chol, tf.matmul(U, diff))
         beta = tf.linalg.triangular_solve(tf.transpose(L, (1, 0)),
                                           beta,
                                           lower=False)
         mean = tf.matmul(K_pred_ind / self.noise ** 2, beta)[:, 0]
         
-        # Compute covariance
+        # Compute posterior covariance
         C = tf.linalg.triangular_solve(L, K_ind_pred)
         D = tf.linalg.triangular_solve(B_chol, C)
         
@@ -297,10 +300,15 @@ class VFEGP(tf.keras.Model):
         log_det_noise = - N / 2 * tf.math.log(self.noise ** 2)
         
         # Log of determinant of normalising term
-        log_det = log_pi + log_det_B + log_det_noise       
-        
+        log_det = log_pi + log_det_B + log_det_noise
+
+        # Compute prior mean
+        prior_mean = self.mean(self.x_train)
+        check_shape([prior_mean, self.x_train, self.y_train],
+                    [('N', 1), ('N', 'D'), ('N', 1)])
+
         # Compute quadratic form
-        diff = self.y_train # - self.mean(self.x_train)[:, None]
+        diff = self.y_train - prior_mean
         c = tf.linalg.triangular_solve(B_chol,
                                        tf.matmul(A, diff),
                                        lower=True) / self.noise
@@ -335,27 +343,35 @@ class VFEGP(tf.keras.Model):
         
         # Draw a sample function from the RFF prior - rff_prior is a function
         rff_prior = self.cov.sample_rff(num_features)
-        
+
+        # Compute prior mean
+        prior_mean = self.mean(self.x_train)
+        check_shape([prior_mean, self.x_train, self.y_train],
+                    [('N', 1), ('N', 'D'), ('N', 1)])
+
+        # Compute necessary covariance matrices
         K_ind_ind = self.cov(self.x_ind, self.x_ind, epsilon=1e-9)
         K_ind_train = self.cov(self.x_ind, self.x_train)
         
         # Compute intermediate matrices using Cholesky for numerical stability
         L, U, A, B, B_chol = self.compute_helper_matrices(K_ind_ind,
                                                           K_ind_train)
-        
+
         # Compute mean of VFE posterior over inducing values
+        diff = self.y_train - prior_mean
         u_mean = self.noise ** -2 * \
-                 L @ tf.linalg.cholesky_solve(B_chol, U @ self.y_train)
+                 L @ tf.linalg.cholesky_solve(B_chol, U @ diff)
+        u_mean = u_mean + prior_mean
         
         # Compute Cholesky of covariance of VFE posterior over inducing values
         u_cov_chol = tf.linalg.triangular_solve(B_chol, tf.transpose(L, (1, 0)))
-        
+
         rand = tf.random.normal((M, 1), dtype=self.dtype)
         
-        u = u_mean[:, 0] + tf.matmul(u_cov_chol, rand, transpose_a=True)[:, 0]
+        u = u_mean + tf.matmul(u_cov_chol, rand, transpose_a=True)
 
-        residual = u - rff_prior(self.x_ind)
-        v = tf.linalg.cholesky_solve(L, residual[:, None])[:, 0]
+        residual = u - (prior_mean + rff_prior(self.x_ind)[:, None])
+        v = tf.linalg.cholesky_solve(L, residual)
 
         def post_sample(x: tf.Tensor, add_noise: bool) -> tf.Tensor:
 
@@ -365,10 +381,8 @@ class VFEGP(tf.keras.Model):
             # Covariance between inputs and inducing points
             K_x_ind = self.cov(x, self.x_ind)
             
-            sample = rff_prior(x) + tf.linalg.matvec(K_x_ind, v)
+            sample = rff_prior(x)[:, None] + K_x_ind @ v
 
-            print(sample.dtype, self.dtype)
-                     
             if add_noise:
                 sample = sample + tf.random.normal(mean=0.,
                                                    stddev=self.noise,
