@@ -301,7 +301,9 @@ class VFEGP(tf.keras.Model):
         
         # Compute quadratic form
         diff = self.y_train - self.mean(self.x_train)[:, None]
-        c = tf.linalg.triangular_solve(B_chol, tf.matmul(A, diff), lower=True) / self.noise
+        c = tf.linalg.triangular_solve(B_chol,
+                                       tf.matmul(A, diff),
+                                       lower=True) / self.noise
         quad = - 0.5 * tf.reduce_sum((diff / self.noise) ** 2)
         quad = quad + 0.5 * tf.reduce_sum(c ** 2)
         
@@ -335,7 +337,6 @@ class VFEGP(tf.keras.Model):
         rff_prior = self.cov.sample_rff(num_features)
         
         K_ind_ind = self.cov(self.x_ind, self.x_ind, epsilon=1e-9)
-        K_train_ind = self.cov(self.x_train, self.x_ind)
         K_ind_train = self.cov(self.x_ind, self.x_train)
         
         # Compute intermediate matrices using Cholesky for numerical stability
@@ -352,8 +353,10 @@ class VFEGP(tf.keras.Model):
         rand = tf.random.normal((M, 1), dtype=self.dtype)
         
         u = u_mean[:, 0] + tf.matmul(u_cov_chol, rand, transpose_a=True)[:, 0]
-        v = tf.linalg.cholesky_solve(L, (u - rff_prior(self.x_ind))[:, None])[:, 0]
-        
+
+        residual = u - rff_prior(self.x_ind)
+        v = tf.linalg.cholesky_solve(L, residual[:, None])[:, 0]
+
         def post_sample(x: tf.Tensor, add_noise: bool) -> tf.Tensor:
 
             # Check input shape
