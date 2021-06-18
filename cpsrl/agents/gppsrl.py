@@ -49,6 +49,8 @@ class GPPSRLAgent(ABC):
             - Optimises the policy
         """
 
+        # Add data to GP models
+
         # Update pseudopoints of the GP models
 
         # Train the dynamics and reward models
@@ -73,7 +75,53 @@ class GPPSRLAgent(ABC):
         :return:
         """
 
+        # Check shape of initial states
         check_shape(s0, ('R', 'S'))
+        R, S = s0.shape
+
+        # Set state to initial state
+        s = s0
+
+        # Arrays for storing rollouts
+        states = []
+        actions = []
+        next_states = []
+        rewards = []
+
+        cumulative_reward = 0.
 
         for i in range(horizon):
-            pass
+
+            # Get action from the policy
+            a = self.policy(s)
+
+            # Check shape of action returned by the policy is correct
+            check_shape([s, a], [(R, S), (R, -1)])
+
+            # Concatenate states and actions
+            sa = tf.concat([s, a], axis=1)
+
+            # Get next state and rewards from the model samples
+            s_ = dynamics_sample(sa, add_noise=True)
+            r = rewards_sample(s, add_noise=True)[:, 0]
+
+            # Check shapes of next state and rewards
+            check_shape([s, s_, r], [(R, S), (R, S), (R, 1)])
+
+            # Store states, actions and rewards
+            states.append(s)
+            actions.append(a)
+            next_states.append(s_)
+            rewards.append(r)
+
+            # Increment cumulative reward and update state
+            cumulative_reward = cumulative_reward + r
+            s = s_
+
+        states = tf.stack(states, axis=1)
+        actions = tf.stack(actions, axis=1)
+        next_states = tf.stack(next_states, axis=1)
+        rewards = tf.stack(rewards, axis=1)
+
+        return cumulative_reward, states, actions, next_states, rewards
+
