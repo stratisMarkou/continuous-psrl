@@ -221,7 +221,7 @@ class VFEGP(tf.keras.Model):
         """
         return tf.math.exp(self.log_noise)
 
-    def post_pred(self, x_pred: tf.Tensor) -> List[tf.Tensor, tf.Tensor]:
+    def post_pred(self, x_pred: tf.Tensor) -> List[tf.Tensor]:
         """
         Computes the predictive posterior of the VFE GP model in a
         numerically stable way, returning the mean vector and covariance
@@ -366,11 +366,14 @@ class VFEGP(tf.keras.Model):
             K_x_ind = self.cov(x, self.x_ind)
             
             sample = rff_prior(x) + tf.linalg.matvec(K_x_ind, v)
+
+            print(sample.dtype, self.dtype)
                      
             if add_noise:
                 sample = sample + tf.random.normal(mean=0.,
                                                    stddev=self.noise,
-                                                   shape=sample.shape)
+                                                   shape=sample.shape,
+                                                   dtype=self.dtype)
             return sample
         
         return post_sample
