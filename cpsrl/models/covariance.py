@@ -123,4 +123,3 @@ class EQ(Covariance):
             return tf.einsum('f, fn -> n', weights, features)
 
         return rff
-
