@@ -300,11 +300,11 @@ class VFEGP(tf.keras.Model):
         log_det = log_pi + log_det_B + log_det_noise       
         
         # Compute quadratic form
-        diff = self.y_train - self.mean(self.x_train)[:, None]
+        diff = self.y_train # - self.mean(self.x_train)[:, None]
         c = tf.linalg.triangular_solve(B_chol,
                                        tf.matmul(A, diff),
                                        lower=True) / self.noise
-        quad = - 0.5 * tf.reduce_sum((diff / self.noise) ** 2)
+        quad = - 0.5 * tf.reduce_sum(diff ** 2) / self.noise ** 2
         quad = quad + 0.5 * tf.reduce_sum(c ** 2)
         
         # Compute trace term
