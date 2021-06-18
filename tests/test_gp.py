@@ -13,6 +13,11 @@ DTYPE = tf.float64
 
 
 def test_constant_mean():
+    """
+    Initialises a constant mean and passes some randomly sampled data
+    through it, and checks if the output mean has the correct shape.
+    :return:
+    """
 
     num_points = 5
     input_dim = 3
@@ -30,6 +35,11 @@ def test_constant_mean():
 
 
 def test_linear_mean():
+    """
+    Initialises a linear mean and passes some randomly sampled data
+    through it, and checks if the output mean has the correct shape.
+    :return:
+    """
 
     num_points = 5
     input_dim = 3
@@ -51,6 +61,11 @@ def test_linear_mean():
 # ==============================================================================
 
 def test_eq_cov():
+    """
+    Initialises an EQ covariance and passes some randomly sampled data
+    through it, and checks if the output covariance has the correct shape.
+    :return:
+    """
 
     N1 = 10
     N2 = 4
