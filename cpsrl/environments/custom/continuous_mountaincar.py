@@ -1,9 +1,11 @@
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 import numpy as np
+import matplotlib.pyplot as plt
 
-from cpsrl.environments.environment import Environment
+from cpsrl.environments import Environment
 from cpsrl.errors import EnvironmentError
+from cpsrl.train_utils import Transition
 from cpsrl.helpers import check_shape
 
 # =============================================================================
@@ -85,3 +87,50 @@ class MountainCar(Environment):
         reward = np.exp(-0.5 * np.sum(diff**2))
 
         return reward
+
+    def plot_trajectories(self,
+                          trajectories: List[List[Transition]],
+                          save_dir: Optional[str] = None):
+        fig = plt.figure()
+
+        # joint axis
+        ax = fig.add_subplot(111)
+        ax.spines['top'].set_color('none')
+        ax.spines['bottom'].set_color('none')
+        ax.spines['left'].set_color('none')
+        ax.spines['right'].set_color('none')
+        ax.tick_params(labelcolor='w', top=False, bottom=False, left=False, right=False)
+
+        # position
+        ax1 = fig.add_subplot(311)
+        ax1.set_ylabel("Position")
+        plt.setp(ax1.get_xticklabels(), visible=False)
+
+        # velocity
+        ax2 = fig.add_subplot(312, sharex=ax1)
+        ax2.set_ylabel("Velocity")
+        plt.setp(ax2.get_xticklabels(), visible=False)
+
+        # action
+        ax3 = fig.add_subplot(313, sharex=ax1)
+        ax3.set_ylabel("Action")
+
+        for trajectory in trajectories:
+            t = np.arange(len(trajectory))
+            states, actions, _, _ = Transition(*zip(*trajectory))
+            states, actions = np.array(states), np.array(actions)
+
+            ax1.plot(t, states[:, 0])
+            ax2.plot(t, states[:, 1])
+            ax3.plot(t, actions)
+
+        ax.set_xlabel('Time')
+        fig.align_ylabels([ax1, ax2, ax3])
+
+        if save_dir is not None:
+            plt.savefig(save_dir, bbox_inches="tight")
+
+        plt.close()
+
+
+

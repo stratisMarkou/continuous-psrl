@@ -3,17 +3,13 @@ import json
 import pickle
 import argparse
 import sys
-from typing import Tuple, List
-from collections import namedtuple
 
-from cpsrl.agents import Agent, RandomAgent, GPPSRLAgent
-from cpsrl.environments import Environment, MountainCar, CartPole
-
+from cpsrl.agents import RandomAgent, GPPSRLAgent
+from cpsrl.environments import MountainCar, CartPole
+from cpsrl.train_utils import play_episode
 from cpsrl.helpers import set_seed, Logger
 
 parser = argparse.ArgumentParser()
-
-Transition = namedtuple("Transition", ("obs", "action", "reward", "next_obs"))
 
 # Base arguments
 parser.add_argument("env",
@@ -53,30 +49,6 @@ parser.add_argument("--model_dir",
 #
 # # Agent parameters
 # parser.add_argument("--agent_params")
-
-# =============================================================================
-# Helper for training one episode
-# =============================================================================
-
-
-def play_episode(agent: Agent,
-                 environment: Environment) -> Tuple[float, List[Transition]]:
-    """Plays an episode with the current policy."""
-    state = environment.reset()
-    cumulative_reward = 0
-    episode = []
-
-    while True:
-        action = agent.act(state)
-        next_state, reward = environment.step(action)
-
-        cumulative_reward += reward
-        episode.append(Transition(state, action, next_state, reward))
-        state = next_state
-
-        if environment.done: break
-
-    return cumulative_reward, episode
 
 
 # =============================================================================
