@@ -1,7 +1,10 @@
+from typing import List, Callable, Optional
+
 import tensorflow as tf
 import numpy as np
 
-from cpsrl.errors import ModelError
+from cpsrl.models.mean import Mean
+from cpsrl.models.covariance import Covariance
 from cpsrl.helpers import check_shape
 
 
@@ -12,7 +15,20 @@ from cpsrl.helpers import check_shape
 
 class VFEGPStack(tf.keras.Model):
     
-    def __init__(self, vfe_gps, dtype, name='gp_stack', **kwargs):
+    def __init__(self,
+                 vfe_gps: List,
+                 dtype: tf.DType,
+                 name: str = 'gp_stack',
+                 **kwargs):
+        """
+        Creates a stack of single-output VFE GP models, for multi-output
+        regression, where the models model the different outputs independently.
+
+        :param vfe_gps: VFE GP models to use in the stack
+        :param dtype: dtype of the stack
+        :param name: name for the model
+        :param kwargs:
+        """
         
         super().__init__(name=name, dtype=dtype, **kwargs)
         
@@ -21,34 +37,52 @@ class VFEGPStack(tf.keras.Model):
         for vfe_gp in vfe_gps:
             self.vfe_gps.append(vfe_gp)
     
-    
-    def add_training_data(self, x_train, y_train):
+    def add_training_data(self, x_train: tf.Tensor, y_train: tf.Tensor):
+        """
+        Adds training data to the model, giving each VFE GP in the stack an
+        identical copy of the data.
+
+        :param x_train: tensor of shape (N, D1)
+        :param y_train: tensor of shape (N, D2)
+        :return:
+        """
         
         check_shape([x_train, y_train], [('N', '-1'), ('N', '-1')])
         
         for i, vfe_gp in enumerate(self.vfe_gps):
             vfe_gp.add_training_data(x_train, y_train[:, i:i+1])
     
-    
-    def sample_posterior(self, num_features):
+    def sample_posterior(self, num_features: int) -> Callable:
+        """
+        Produces a posterior sample, using *num_features* random fourier
+        features, returning the sample in the form of a Callable with signature:
+
+            post_sample(x: tf.Tensor, add_noise: bool).
+
+        The *x* argument is assumed to be a tf.Tensor of shape (N, D),
+        where D is the input dimension of the VFEGP. If *add_noise* is True,
+        calling the posterior sample adds noise to its output.
+
+        :param num_features:
+        :return: posterior sample as Callable
+        """
         
         post_samples = [vfe_gp.sample_posterior(num_features=num_features) \
                         for vfe_gp in self.vfe_gps]
         
-        def post_sample(x, add_noise):
+        def post_sample(x: tf.Tensor, add_noise: bool) -> tf.Tensor:
             
             # Check shape of input against training
             check_shape([x, self.vfe_gps[0].x_train],
                         [('N1', 'D'), ('N2', 'D')])
-            
+
             samples = [sample(x, add_noise) for sample in post_samples]
             
             return tf.stack(samples, axis=1)
             
         return post_sample
     
-    
-    def free_energy(self):
+    def free_energy(self) -> tf.Tensor:
         return tf.reduce_sum([vfe_gp.free_energy() for vfe_gp in self.vfe_gps])
     
 
@@ -60,30 +94,43 @@ class VFEGPStack(tf.keras.Model):
 class VFEGP(tf.keras.Model):
     
     def __init__(self,
-                 mean,
-                 cov,
-                 x_train,
-                 y_train,
-                 x_ind,
-                 ind_fraction,
-                 trainable_inducing,
-                 log_noise,
-                 trainable_noise,
-                 dtype,
+                 mean: Mean,
+                 cov: Covariance,
+                 x_train: tf.Tensor,
+                 y_train: tf.Tensor,
+                 trainable_inducing: bool,
+                 log_noise: float,
+                 trainable_noise: bool,
+                 dtype: tf.DType,
+                 x_ind: Optional[tf.Tensor] = None,
+                 num_ind: Optional[int] = None,
                  name='vfegp',
                  **kwargs):
-        
         """
-        
-        Params:
-            
-            mean (cpsrl.models.mean) : mean function for the GP
-            cov (cpsrl.models.covariance) : covariance function of the GP
-            x_train (tf.tensor, np.array) : training inputs (N, D)
-            y_train (tf.tensor, np.array) : training outputs (N)
-            x_ind (tf.tensor, np.array) : x_ind
+        Gaussian Process model using the Variational Free Energy approximation
+        of Titsias.
+
+        Inducing points can either be initialised by specifiying their
+        initial locations using *x_ind*, or by specifying an integer number
+        *num_ind* of inducing points to use, in which case the points are
+        initialised as a random subset of the training points.
+
+        Exactly one of *x_ind* or *num_ind* should be specified, otherwise an
+        error will be thrown.
+
+        :param mean: mean function of the GP
+        :param cov: covariance function of the GP
+        :param x_train: training inputs, shape (N, D)
+        :param y_train: training outputs, shape (N, 1)
+        :param trainable_inducing: whether to allow inducing locations to train
+        :param log_noise: log of noise of VFEGP
+        :param trainable_noise: whether to allow the noise level to train
+        :param dtype: data type of the GP model
+        :param x_ind: optional, initial inducing point locations
+        :param num_ind: optional, number of inducing points to use
+        :param name:
+        :param kwargs:
         """
-        
         super().__init__(name=name, dtype=dtype, **kwargs)
         
         # Check x_train and y_train have compatible shapes
@@ -96,7 +143,7 @@ class VFEGP(tf.keras.Model):
         self.add_training_data(x_train, y_train)
         
         # Initialise inducing points
-        self.x_ind = self.init_inducing(x_ind, ind_fraction)
+        self.x_ind = self.init_inducing(x_ind, num_ind)
         self.x_ind = tf.Variable(self.x_ind, trainable=trainable_inducing)
         
         # Set mean and covariance functions
@@ -107,31 +154,52 @@ class VFEGP(tf.keras.Model):
         self.log_noise = tf.convert_to_tensor(log_noise, dtype=dtype)
         self.log_noise = tf.Variable(self.log_noise, trainable=trainable_noise)
         
-    
-    def init_inducing(self, x_ind, ind_fraction):
+    def init_inducing(self, x_ind: tf.Tensor, num_ind: int) -> tf.Tensor:
+        """
+        Creates a tensor containing the initial inducing point locations.
+        Assumes exactly one of *x_ind* or *num_ind* is specified,
+        and otherwise throws an error.
+
+        If *x_ind* is specified, this tensor is used to specify the inducing
+        point locations. If *num_ind* is specified, then the model uses a
+        random subset of the training data of size *num_ind* as the initial
+        inducing point locations.
+
+        :param x_ind: optional, initial inducing point locations, shape (N, D)
+        :param num_ind: optional, number of inducing points to use
+        :return:
+        """
         
-        assert ((x_ind is not None) and (ind_fraction is None)) or \
-               ((x_ind is None) and (ind_fraction is not None))
+        assert ((x_ind is not None) and (num_ind is None)) or \
+               ((x_ind is None) and (num_ind is not None))
         
         # Set inducing points either to initial locations or on training data
         if x_ind is not None:
+
+            # Check the inducing point shape
+            check_shape([self.x_train, x_ind], [('N', 'D'), ('M', 'D')])
+
             x_ind = tf.convert_to_tensor(x_ind, dtype=self.dtype)
             
         else:
-            num_train = self.x_train.shape[0]
-            num_inducing = int(ind_fraction * num_train + 0.5)
-            
-            ind_idx = np.random.choice(np.arange(num_train),
-                                       size=(num_inducing,),
+            ind_idx = np.random.choice(np.arange(self.x_train.shape[0]),
+                                       size=(num_ind,),
                                        replace=False)
-            
+
             x_ind = tf.convert_to_tensor(self.x_train.numpy()[ind_idx],
                                          dtype=self.dtype)
             
         return x_ind
     
         
-    def add_training_data(self, x_train, y_train):
+    def add_training_data(self, x_train: tf.Tensor, y_train: tf.Tensor):
+        """
+        Adds data to the model's training data.
+
+        :param x_train: new training inputs, shape (N, D)
+        :param y_train: new training outputs, shape (N, 1)
+        :return:
+        """
         
         # Check x_train and y_train have compatible shapes
         check_shape([self.x_train, x_train, self.y_train, y_train],
@@ -143,11 +211,14 @@ class VFEGP(tf.keras.Model):
     
     
     @property
-    def noise(self):
+    def noise(self) -> tf.Tensor:
+        """
+        The standard deviation of the Gaussian noise of the GP model.
+        :return:
+        """
         return tf.math.exp(self.log_noise)
-        
-        
-    def post_pred(self, x_pred):
+
+    def post_pred(self, x_pred: tf.Tensor):
         
         # Number of training points
         N = self.y_train.shape[0]
@@ -183,7 +254,6 @@ class VFEGP(tf.keras.Model):
         cov = cov + tf.matmul(D, D, transpose_a=True)
         
         return mean, cov
-        
         
     def free_energy(self):
         
