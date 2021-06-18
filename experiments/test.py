@@ -1,5 +1,7 @@
 import argparse
 
+import numpy as np
+
 from cpsrl.agents import Agent, RandomAgent
 from cpsrl.environments import MountainCar, CartPole
 from cpsrl.helpers import set_seed
@@ -45,17 +47,15 @@ if __name__ == "__main__":
 
     # For each episode
     trajectories = []
+    returns = []
     for i in range(args.num_episodes):
         # Play episode
         cumulative_reward, episode = play_episode(agent=agent, environment=env)
 
-        # Observe episode
-        agent.observe(episode)
-
-        # Train agent models and/or policy
-        agent.update()
-
+        returns.append(cumulative_reward)
         trajectories.append(episode)
         print(f'Episode {i} | Return: {cumulative_reward:.3f}')
 
     env.plot_trajectories(trajectories, save_dir="test.jpg")
+    mean_return, std_return = np.mean(returns), np.std(returns)
+    print(f'Mean Return: {mean_return:.3f}, Std Return: {std_return:.3f}')
