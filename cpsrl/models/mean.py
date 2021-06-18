@@ -61,12 +61,17 @@ class LinearMean(Mean):
         super().__init__(name=name, dtype=dtype)
 
         self.input_dim = input_dim
+
         self.coefficients = tf.Variable(tf.zeros(shape=(input_dim, 1),
                                                  dtype=dtype),
                                         trainable=trainable)
+
+        self.constant = tf.Variable(tf.zeros(shape=(),
+                                             dtype=dtype),
+                                    trainable=trainable)
 
     def __call__(self, x: tf.Tensor):
 
         check_shape(x, (-1, self.input_dim))
 
-        return tf.matmul(x, self.coefficients)
+        return tf.matmul(x, self.coefficients) + self.constant
