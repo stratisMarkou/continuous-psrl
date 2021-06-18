@@ -3,8 +3,17 @@
 ## Infrastructure notes
 
 Things we would like to add to the codebase:
-* Functionality for testing models on randomly sampled ground truth data.
-* Plotting rewards (and trajectories of simple environments).
-* Agent snapshot saving and loading.
-* Tests for the GP models (VFEGP and VFEGPStack).
-* Finish agent implementation.
+* Add simple policies
+* Fix first step
+* Finish agent implementation
+* Modify GPs to use deltas
+* Functionality for testing models on randomly sampled ground truth data
+* Agent snapshot saving and loading
+* Initialisation helper (maybe in VFEGP stack?)
+* Look into checkshape bug
+
+
+## General ideas
+
+* Updating the models using continual learning
+* Multi-output GPs, correlated output models

@@ -159,7 +159,6 @@ def test_vfe_gp_training():
 
             free_energy = vfe_gp.free_energy()
             loss = - free_energy
-            print(loss, vfe_gp.noise, vfe_gp.cov.scales, vfe_gp.x_ind[0])
 
         gradients = tape.gradient(loss, vfe_gp.trainable_variables)
         optimizer.apply_gradients(zip(gradients, vfe_gp.trainable_variables))

@@ -3,6 +3,7 @@ from abc import ABC
 
 from cpsrl.models.gp import VFEGP, VFEGPStack
 from cpsrl.helpers import *
+from cpsrl.errors import AgentError
 from cpsrl.policies.policies import Policy
 
 import tensorflow as tf
@@ -49,20 +50,18 @@ class GPPSRLAgent(ABC):
             - Optimises the policy
         """
 
-        # Add data to GP models
-
         # Update pseudopoints of the GP models
 
         # Train the dynamics and reward models
 
         # Optimise the policy
 
-
     def rollout(self,
                 dynamics_sample: Callable[[tf.Tensor], tf.Tensor],
                 rewards_sample: Callable[[tf.Tensor], tf.Tensor],
                 horizon: int,
-                s0: tf.Tensor):
+                s0: tf.Tensor,
+                gamma: float) -> tf.Tensor:
         """
         Performs Monte Carlo rollouts, using a posterior sample of the dynamics
         and a posterior sample of the rewards models, for a length of *horizon*,
@@ -72,11 +71,16 @@ class GPPSRLAgent(ABC):
         :param rewards_sample:
         :param horizon:
         :param s0:
+        :param gamma:
         :return:
         """
 
+        # Check discount factor is valid
+        if not 0. <= gamma <= 1.:
+            raise AgentError(f"Agent expected gamma between 0 and 1, "
+                             f"got {gamma}.")
+
         # Check shape of initial states
-        check_shape(s0, ('R', 'S'))
         R, S = s0.shape
 
         # Set state to initial state
@@ -88,7 +92,7 @@ class GPPSRLAgent(ABC):
         next_states = []
         rewards = []
 
-        cumulative_reward = 0.
+        cumulative_reward = tf.zeros(shape=(R,), dtype=self.dtype)
 
         for i in range(horizon):
 
@@ -96,17 +100,20 @@ class GPPSRLAgent(ABC):
             a = self.policy(s)
 
             # Check shape of action returned by the policy is correct
-            check_shape([s, a], [(R, S), (R, -1)])
+            check_shape([s, a], [(R, S), (R, 'A')])
 
             # Concatenate states and actions
             sa = tf.concat([s, a], axis=1)
 
             # Get next state and rewards from the model samples
             s_ = dynamics_sample(sa, add_noise=True)
-            r = rewards_sample(s, add_noise=True)[:, 0]
+            r = rewards_sample(s, add_noise=True)
 
             # Check shapes of next state and rewards
             check_shape([s, s_, r], [(R, S), (R, S), (R, 1)])
+
+            # Remove last dimension from reward
+            r = tf.squeeze(r, axis=1)
 
             # Store states, actions and rewards
             states.append(s)
@@ -115,7 +122,7 @@ class GPPSRLAgent(ABC):
             rewards.append(r)
 
             # Increment cumulative reward and update state
-            cumulative_reward = cumulative_reward + r
+            cumulative_reward = cumulative_reward + (gamma ** i) * r
             s = s_
 
         states = tf.stack(states, axis=1)
