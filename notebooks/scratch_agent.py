@@ -112,6 +112,9 @@ agent = GPPSRLAgent(dynamics_model=dyn_vfe_stack,
                     policy=policy,
                     dtype=dtype)
 
+print("# =====================================================================")
+print("# Training dynamics model")
+print("# =====================================================================")
 
 num_steps = 10
 optimiser = tf.optimizers.Adam(1e-1)
@@ -130,7 +133,9 @@ for i in range(num_steps):
     optimiser.apply_gradients(zip(dyn_grads,
                                   dyn_vfe_stack.trainable_variables))
 
-print("=======================================================================")
+print("# =====================================================================")
+print("# Training rewards model")
+print("# =====================================================================")
 
 num_steps = 10
 optimiser = tf.optimizers.Adam(1e-1)
@@ -150,19 +155,35 @@ for i in range(num_steps):
                                   rew_vfe_gp.trainable_variables))
 
 
+print("# =====================================================================")
+print("# Training policy")
+print("# =====================================================================")
+
+num_steps = 100
 num_features = 200
+optimiser = tf.optimizers.Adam(1e-3)
 
 dyn_sample = dyn_vfe_stack.sample_posterior(num_features=num_features)
 rew_sample = rew_vfe_gp.sample_posterior(num_features=num_features)
 
+for i in range(num_steps):
+    with tf.GradientTape() as tape:
 
-rollout = agent.rollout(dynamics_sample=dyn_sample,
-                        rewards_sample=rew_sample,
-                        horizon=horizon,
-                        gamma=gamma,
-                        s0=s0)
+        tape.watch(policy.trainable_variables)
 
-cumulative_reward, states, actions, next_states, rewards = rollout
+        rollout = agent.rollout(dynamics_sample=dyn_sample,
+                                rewards_sample=rew_sample,
+                                horizon=horizon,
+                                gamma=gamma,
+                                s0=s0)
 
-print(cumulative_reward)
+        cumulative_reward, states, actions, next_states, rewards = rollout
+
+        loss = - tf.reduce_mean(cumulative_reward) / horizon
+        print(loss)
+
+    grads = tape.gradient(loss, policy.trainable_variables)
+    optimiser.apply_gradients(zip(grads, policy.trainable_variables))
+
+
 
