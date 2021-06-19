@@ -1,4 +1,4 @@
-from abc import ABC
+from abc import ABC, abstractmethod
 from typing import List
 import warnings
 
@@ -28,6 +28,10 @@ class InitialStateDistribution(ABC):
         # Set training data and data type
         self.x_train = tf.zeros(shape=(0, len(state_space)), dtype=dtype)
         self.dtype = dtype
+
+    @abstractmethod
+    def train(self):
+        pass
 
     @property
     def distribution(self) -> tfd.Distribution:
@@ -67,7 +71,7 @@ class IndependentGaussian(InitialStateDistribution):
     def distribution(self) -> tfd.Distribution:
         return self.distribution_kind(loc=self.mean, scale_diag=self.scales)
 
-    def update(self):
+    def train(self):
 
         if self.trainable:
 

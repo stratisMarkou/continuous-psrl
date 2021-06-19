@@ -77,10 +77,19 @@ class GPPSRLAgent(Agent):
         """
 
         # Update pseudopoints of the GP models
+        # self.dynamics_model.reset_inducing(num_inducing)
+        # self.rewards_model.reset_inducing(num_inducing)
 
         # Train the initial distribution, dynamics and reward models
+        self.initial_distribution.train()
+        # self.dynamics_model.train()
+        # self.rewards_model.train()
 
         # Optimise the policy
+        self.optimise_policy(num_rollouts=num_rollouts,
+                             num_features=num_features,
+                             num_steps=num_steps,
+                             learn_rate=learn_rate)
 
     def optimise_policy(self,
                         num_rollouts: int,
@@ -137,7 +146,7 @@ class GPPSRLAgent(Agent):
                 rewards_sample: Callable[[tf.Tensor], tf.Tensor],
                 horizon: int,
                 s0: tf.Tensor,
-                gamma: float) -> tf.Tensor:
+                gamma: float) -> List[tf.Tensor]:
         """
         Performs Monte Carlo rollouts, using a posterior sample of the dynamics
         and a posterior sample of the rewards models, for a length of *horizon*,
