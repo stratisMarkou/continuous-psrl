@@ -51,3 +51,72 @@ class RandomPolicy(Policy):
         action = action + state
 
         return action
+
+
+# ==============================================================================
+# Fully connected neural network policy
+# ==============================================================================
+
+class FCNPolicy(Policy, tf.keras.Model):
+
+    def __init__(self,
+                 hidden_sizes: List[int],
+                 state_space: List[Tuple],
+                 action_space: List[Tuple],
+                 trainable: bool,
+                 dtype: tf.DType,
+                 name='fcn_policy',
+                 **kwargs):
+
+        # Policy superclass initialisation
+        Policy.__init__(state_space=state_space,
+                        action_space=action_space)
+
+        # Keras superclass initialisation
+        tf.keras.Model.__init__(dtype=dtype, name=name, **kwargs)
+
+        # Initialise the layers
+        self.S = len(state_space)
+        self.A = len(action_space)
+
+        self.sizes = [self.S] + [hidden_sizes] + [self.A]
+        self.sizes = zip(self.sizes[:-1], self.sizes[1:])
+
+        # Create weight and bias tensors
+        self.W = [tf.random.normal(shape=(s1, s2), dtype=dtype) / s1 ** 0.5
+                  for s1, s2, in self.sizes]
+        self.W = [tf.Variable(W, trainable=trainable) for W in self.W]
+
+        self.b = [tf.zeros(shape=(s2, 1), dtype=dtype)
+                  for s1, s2, in self.sizes]
+        self.b = [tf.Variable(b, trainable=trainable) for b in self.b]
+
+        # Tensors for scaling the final action, outputed by the policy
+        self.action_ranges = [a2 - a1 for a1, a2 in self.action_space]
+        self.action_ranges = tf.convert_to_tensor(self.action_ranges)
+
+        self.action_centers = [0.5 * (a1 + a2) for a1, a2 in self.action_space]
+        self.action_centers = tf.convert_to_tensor(self.action_centers)
+
+    def __call__(self, tensor: tf.Tensor) -> tf.Tensor:
+
+        # Check input shape is valid
+        check_shape(tensor, (-1, self.S))
+
+        for i, (W, b) in enumerate(zip(self.W[:-1], self.b[:-1])):
+
+            # Multiply by weights and add bias
+            tensor = tensor @ W + b
+
+            # If not at the last layer, apply relu
+            if i < len(self.sizes) - 1:
+                tensor = tf.nn.relu(tensor)
+
+            # If  at last layer, apply sine and scale to action range
+            else:
+                tensor = tf.sin(tensor)
+                tensor = tensor + self.action_ranges[None, :]
+                tensor = tensor + self.action_centers
+
+        return tensor
+
