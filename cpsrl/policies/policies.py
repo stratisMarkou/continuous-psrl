@@ -16,7 +16,7 @@ class Policy:
     def __init__(self,
                  state_space: List[Tuple],
                  action_space: List[Tuple],
-                 dtype: tf.DType):
+                 dtype: tf.DType = None):
 
         self.state_space = state_space
         self.S = len(state_space)
@@ -24,8 +24,8 @@ class Policy:
         self.action_space = action_space
         self.A = len(action_space)
 
-        self.dtype = dtype
-
+        if dtype is not None:
+            self.dtype = dtype
 
     @abstractmethod
     def __call__(self, state: tf.Tensor) -> tf.Tensor:
@@ -69,41 +69,44 @@ class FCNPolicy(Policy, tf.keras.Model):
                  **kwargs):
 
         # Policy superclass initialisation
-        Policy.__init__(state_space=state_space,
+        Policy.__init__(self,
+                        state_space=state_space,
                         action_space=action_space)
 
         # Keras superclass initialisation
-        tf.keras.Model.__init__(dtype=dtype, name=name, **kwargs)
+        tf.keras.Model.__init__(self, dtype=dtype, name=name, **kwargs)
 
         # Initialise the layers
         self.S = len(state_space)
         self.A = len(action_space)
 
-        self.sizes = [self.S] + [hidden_sizes] + [self.A]
-        self.sizes = zip(self.sizes[:-1], self.sizes[1:])
+        self.sizes = [self.S] + hidden_sizes + [self.A]
+        self.sizes = list(zip(self.sizes[:-1], self.sizes[1:]))
 
         # Create weight and bias tensors
         self.W = [tf.random.normal(shape=(s1, s2), dtype=dtype) / s1 ** 0.5
                   for s1, s2, in self.sizes]
         self.W = [tf.Variable(W, trainable=trainable) for W in self.W]
 
-        self.b = [tf.zeros(shape=(s2, 1), dtype=dtype)
+        self.b = [tf.zeros(shape=(1, s2), dtype=dtype)
                   for s1, s2, in self.sizes]
         self.b = [tf.Variable(b, trainable=trainable) for b in self.b]
 
         # Tensors for scaling the final action, outputed by the policy
         self.action_ranges = [a2 - a1 for a1, a2 in self.action_space]
         self.action_ranges = tf.convert_to_tensor(self.action_ranges)
+        self.action_ranges = tf.cast(self.action_ranges, dtype=dtype)
 
         self.action_centers = [0.5 * (a1 + a2) for a1, a2 in self.action_space]
         self.action_centers = tf.convert_to_tensor(self.action_centers)
+        self.action_centers = tf.cast(self.action_centers, dtype=dtype)
 
     def __call__(self, tensor: tf.Tensor) -> tf.Tensor:
 
         # Check input shape is valid
         check_shape(tensor, (-1, self.S))
 
-        for i, (W, b) in enumerate(zip(self.W[:-1], self.b[:-1])):
+        for i, (W, b) in enumerate(zip(self.W, self.b)):
 
             # Multiply by weights and add bias
             tensor = tensor @ W + b

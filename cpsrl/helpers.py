@@ -105,10 +105,11 @@ def check_shape(arrays: ArrayType,
             raise ShapeError(f"Got number of tesors/arrays {len(arrays)}, "
                              f"and number of shapes {len(shapes)}.")
             
-        for array, shape in zip(arrays, shapes):
+        for argnum, (array, shape) in enumerate(zip(arrays, shapes)):
             array, shape_dict = _check_shape(array,
                                              shape,
-                                             shape_dict=shape_dict)
+                                             shape_dict=shape_dict,
+                                             argnum=argnum)
             
         if keep_dict:
             return arrays, shape_dict
@@ -122,7 +123,8 @@ def check_shape(arrays: ArrayType,
 
 def _check_shape(array: np.ndarray,
                  shape: Tuple,
-                 shape_dict: Optional[dict] = None
+                 shape_dict: Optional[dict] = None,
+                 argnum: bool = None
                  ) -> Union[np.ndarray, Tuple[np.ndarray, dict]]:
     
     array_shape = array.shape
@@ -154,7 +156,8 @@ def _check_shape(array: np.ndarray,
                 shape_dict[s2] = s1
                 
             elif shape_dict[s2] != s1:
-                raise ShapeError(f"Tensor/Array shape had {s2} axis size {s1}, "
+                raise ShapeError(f"Tensor/Array at argument postition {argnum} "
+                                 f"had shape with {s2} of size {s1}, "
                                  f"expected axis size {shape_dict[s2]}.")
             
     if check_string_names:

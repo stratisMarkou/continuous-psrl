@@ -2,7 +2,7 @@ from cpsrl.models.mean import LinearMean
 from cpsrl.models.covariance import EQ
 from cpsrl.models.gp import VFEGP, VFEGPStack
 from cpsrl.agents.gppsrl import GPPSRLAgent
-from cpsrl.policies.policies import RandomPolicy
+from cpsrl.policies.policies import FCNPolicy
 
 import tensorflow as tf
 
@@ -46,7 +46,7 @@ dyn_covs = [EQ(log_coeff=dyn_log_coeff,
                log_scales=dyn_log_scales,
                trainable=dyn_trainable_cov,
                dtype=dtype)
-            for i in range(S)]
+            for _ in range(S)]
 
 dyn_vfe_gps = [VFEGP(mean=dyn_means[i],
                      cov=dyn_covs[i],
@@ -98,10 +98,14 @@ rew_vfe_gp = VFEGP(mean=rew_mean,
 
 state_space = S * [(-2, 2)]
 action_space = A * [(-2, 2)]
+hidden_sizes = [64, 64]
+trainable_policy = True
 
-policy = RandomPolicy(state_space=state_space,
-                      action_space=action_space,
-                      dtype=dtype)
+policy = FCNPolicy(hidden_sizes=hidden_sizes,
+                   state_space=state_space,
+                   action_space=action_space,
+                   trainable=trainable_policy,
+                   dtype=dtype)
 
 agent = GPPSRLAgent(dynamics_model=dyn_vfe_stack,
                     rewards_model=rew_vfe_gp,
@@ -109,7 +113,7 @@ agent = GPPSRLAgent(dynamics_model=dyn_vfe_stack,
                     dtype=dtype)
 
 
-num_steps = 50
+num_steps = 10
 optimiser = tf.optimizers.Adam(1e-1)
 
 for i in range(num_steps):
@@ -128,7 +132,7 @@ for i in range(num_steps):
 
 print("=======================================================================")
 
-num_steps = 50
+num_steps = 10
 optimiser = tf.optimizers.Adam(1e-1)
 
 for i in range(num_steps):

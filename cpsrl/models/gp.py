@@ -74,10 +74,6 @@ class VFEGPStack(tf.keras.Model):
                         for vfe_gp in self.vfe_gps]
         
         def post_sample(x: tf.Tensor, add_noise: bool) -> tf.Tensor:
-            
-            # Check shape of input against training
-            check_shape([x, self.vfe_gps[0].x_train],
-                        [('N1', 'D'), ('N2', 'D')])
 
             samples = [sample(x, add_noise) for sample in post_samples]
             
