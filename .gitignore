@@ -1,7 +1,6 @@
 # Custom ignores
 venv-psrl
 .idea/
-models/
 data/
 results/
 logs/
