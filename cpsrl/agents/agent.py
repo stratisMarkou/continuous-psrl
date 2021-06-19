@@ -65,11 +65,12 @@ class RandomAgent(Agent):
                  action_space: List[Tuple[float, float]],
                  rng: np.random.Generator):
 
-        super().__init__(action_space)
+        super().__init__(action_space, gamma=None)
         self.rng = rng
 
     def act(self, state: np.ndarray) -> np.ndarray:
-        return np.array([self.rng.uniform(lo, hi) for lo, hi in self.action_space])
+        return np.array([self.rng.uniform(lo, hi)
+                         for lo, hi in self.action_space])
 
     def observe(self, episode: List[Tuple]):
         pass

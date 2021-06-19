@@ -48,12 +48,13 @@ def convert_episode_to_tensors(episode: List[Transition], dtype: tf.DType):
         episode_sas_.append(np.concatenate([s, a, s_]))
         episode_r.append(r)
 
+    episode_s = tf.convert_to_tensor(episode[0][0], dtype=dtype)
     episode_sa = tf.convert_to_tensor(episode_sa, dtype=dtype)
     episode_s_ = tf.convert_to_tensor(episode_s_, dtype=dtype)
     episode_sas_ = tf.convert_to_tensor(episode_sas_, dtype=dtype)
     episode_r = tf.convert_to_tensor(episode_r, dtype=dtype)
 
-    return episode_sa, episode_s_, episode_sas_, episode_r
+    return episode_s, episode_sa, episode_s_, episode_sas_, episode_r
 
 
 # ==============================================================================

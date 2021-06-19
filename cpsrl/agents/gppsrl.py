@@ -1,9 +1,9 @@
 from typing import List, Tuple, Callable
-from abc import ABC
 
 from cpsrl.policies.policies import Policy
 from cpsrl.agents.agent import Agent
 from cpsrl.models.gp import VFEGP, VFEGPStack
+from cpsrl.models.initial_distributions import InitialStateDistribution
 from cpsrl.errors import AgentError
 from cpsrl.helpers import *
 
@@ -20,6 +20,7 @@ class GPPSRLAgent(Agent):
                  action_space: List[Tuple[float, float]],
                  horizon: int,
                  gamma: float,
+                 initial_distribution: InitialStateDistribution,
                  dynamics_model: VFEGPStack,
                  rewards_model: VFEGP,
                  policy: Policy,
@@ -42,6 +43,7 @@ class GPPSRLAgent(Agent):
                          gamma=gamma)
 
         # Set dynamics and rewards models and policy
+        self.initial_distribution = initial_distribution
         self.dynamics_model = dynamics_model
         self.rewards_model = rewards_model
         self.policy = policy
@@ -58,9 +60,11 @@ class GPPSRLAgent(Agent):
     def observe(self, episode: List[Tuple]):
 
         # Convert episode to tensors, to update the models' training data
-        sa, s_, sas_, r = convert_episode_to_tensors(episode, dtype=self.dtype)
+        s, sa, s_, sas_, r = convert_episode_to_tensors(episode,
+                                                        dtype=self.dtype)
 
         # Update the models' training data
+        self.initial_distribution.add_training_data(s)
         self.dynamics_model.add_training_data(sa, s_)
         self.rewards_model.add_training_data(sas_, r)
 
@@ -74,11 +78,12 @@ class GPPSRLAgent(Agent):
 
         # Update pseudopoints of the GP models
 
-        # Train the dynamics and reward models
+        # Train the initial distribution, dynamics and reward models
 
         # Optimise the policy
 
     def optimise_policy(self,
+                        num_rollouts: int,
                         num_features: int,
                         num_steps: int,
                         learn_rate: float):
@@ -86,6 +91,7 @@ class GPPSRLAgent(Agent):
         Draws a posterior dynamics and rewards model and trains the policy
         using these samples.
 
+        :param num_rollouts: number of rollouts to use
         :param num_features: number of RFF features to use in posterior samples
         :param num_steps: number of optimisation steps to run for
         :param learn_rate: policy optimisation learning rate
@@ -102,18 +108,29 @@ class GPPSRLAgent(Agent):
         for i in range(num_steps):
             with tf.GradientTape() as tape:
 
+                # Ensure policy variables are being watched
                 tape.watch(self.policy.trainable_variables)
 
+                # Draw initial states s0
+                s0 = self.initial_distribution.sample(num_rollouts)
+
+                # Perform rollouts
                 rollout = self.rollout(dynamics_sample=dyn_sample,
                                        rewards_sample=rew_sample,
                                        horizon=self.horizon,
                                        gamma=self.gamma,
                                        s0=s0)
 
+                # Unpack rollout results
                 cum_reward, states, actions, next_states, rewards = rollout
 
+                # Loss is (-ve) mean discounted reward, normalised by horizon
                 loss = - tf.reduce_mean(cum_reward) / self.horizon
-                print(loss)
+
+            # Compute gradients wrt policy variables and apply gradient step
+            gradients = tape.gradient(loss, self.policy.trainable_variables)
+            optimizer.apply_gradients(zip(gradients,
+                                          self.policy.trainable_variables))
 
     def rollout(self,
                 dynamics_sample: Callable[[tf.Tensor], tf.Tensor],
