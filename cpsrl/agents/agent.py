@@ -11,8 +11,14 @@ from abc import ABC, abstractmethod
 
 class Agent(ABC):
 
-    def __init__(self, action_space: List[Tuple[float, float]]):
+    def __init__(self,
+                 action_space: List[Tuple[float, float]],
+                 gamma: float,
+                 horizon: int = None):
+
         self.action_space = action_space
+        self.gamma = gamma
+        self.horizon = horizon
 
     @abstractmethod
     def act(self, state: np.ndarray) -> np.ndarray:

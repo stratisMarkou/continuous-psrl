@@ -1,10 +1,11 @@
 from typing import List, Tuple, Callable
 from abc import ABC
 
-from cpsrl.models.gp import VFEGP, VFEGPStack
-from cpsrl.helpers import *
-from cpsrl.errors import AgentError
 from cpsrl.policies.policies import Policy
+from cpsrl.agents.agent import Agent
+from cpsrl.models.gp import VFEGP, VFEGPStack
+from cpsrl.errors import AgentError
+from cpsrl.helpers import *
 
 import tensorflow as tf
 
@@ -13,18 +14,39 @@ import tensorflow as tf
 # GPPSRL agent
 # =============================================================================
 
-class GPPSRLAgent(ABC):
+class GPPSRLAgent(Agent):
 
     def __init__(self,
+                 action_space: List[Tuple[float, float]],
+                 horizon: int,
+                 gamma: float,
                  dynamics_model: VFEGPStack,
                  rewards_model: VFEGP,
                  policy: Policy,
                  dtype: tf.DType):
+        """
+        PSRL agent using Gaussian Processes for the dynamics and rewards models.
 
+        :param action_space: space of allowed actions
+        :param horizon: episode horizon, used for optimising the policy
+        :param gamma: discount factor
+        :param dynamics_model: dynamics model, collection of independent GPs
+        :param rewards_model: rewards model, single GP modelling the rewards
+        :param policy: policy to use
+        :param dtype: data type of the agent, tf.float32 or tf.float64
+        """
+
+        # Use superclass init
+        super().__init__(action_space=action_space,
+                         horizon=horizon,
+                         gamma=gamma)
+
+        # Set dynamics and rewards models and policy
         self.dynamics_model = dynamics_model
         self.rewards_model = rewards_model
         self.policy = policy
 
+        # Set dtype
         self.dtype = dtype
 
     def act(self, state: ArrayOrTensor) -> tf.Tensor:
@@ -55,6 +77,43 @@ class GPPSRLAgent(ABC):
         # Train the dynamics and reward models
 
         # Optimise the policy
+
+    def optimise_policy(self,
+                        num_features: int,
+                        num_steps: int,
+                        learn_rate: float):
+        """
+        Draws a posterior dynamics and rewards model and trains the policy
+        using these samples.
+
+        :param num_features: number of RFF features to use in posterior samples
+        :param num_steps: number of optimisation steps to run for
+        :param learn_rate: policy optimisation learning rate
+        :return:
+        """
+
+        # Draw dynamics and rewards samples
+        dyn_sample = self.dynamics_model.sample_posterior(num_features)
+        rew_sample = self.rewards_model.sample_posterior(num_features)
+
+        # Initialise optimiser
+        optimizer = tf.optimizers.Adam(learn_rate)
+
+        for i in range(num_steps):
+            with tf.GradientTape() as tape:
+
+                tape.watch(self.policy.trainable_variables)
+
+                rollout = self.rollout(dynamics_sample=dyn_sample,
+                                       rewards_sample=rew_sample,
+                                       horizon=self.horizon,
+                                       gamma=self.gamma,
+                                       s0=s0)
+
+                cum_reward, states, actions, next_states, rewards = rollout
+
+                loss = - tf.reduce_mean(cum_reward) / self.horizon
+                print(loss)
 
     def rollout(self,
                 dynamics_sample: Callable[[tf.Tensor], tf.Tensor],

@@ -107,7 +107,10 @@ policy = FCNPolicy(hidden_sizes=hidden_sizes,
                    trainable=trainable_policy,
                    dtype=dtype)
 
-agent = GPPSRLAgent(dynamics_model=dyn_vfe_stack,
+agent = GPPSRLAgent(action_space=action_space,
+                    horizon=horizon,
+                    gamma=gamma,
+                    dynamics_model=dyn_vfe_stack,
                     rewards_model=rew_vfe_gp,
                     policy=policy,
                     dtype=dtype)
