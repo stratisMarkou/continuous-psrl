@@ -1,11 +1,12 @@
 from abc import ABC
 from typing import List
+import warnings
+
+from cpsrl.helpers import check_shape
 
 import tensorflow as tf
 import tensorflow_probability as tfp
 tfd = tfp.distributions
-
-from cpsrl.helpers import check_shape
 
 
 # ==============================================================================
@@ -22,6 +23,7 @@ class InitialStateDistribution(ABC):
         # Set state space and distribution, state space constraints not enforced
         self.state_space = state_space
         self.distribution_kind = distribution_kind
+        self.S  = len(state_space)
 
         # Set training data and data type
         self.x_train = tf.zeros(shape=(0, len(state_space)), dtype=dtype)
@@ -45,25 +47,37 @@ class InitialStateDistribution(ABC):
 # Gaussian initial distribution
 # ==============================================================================
 
-class IndependentGaussian(ABC):
+class IndependentGaussian(InitialStateDistribution):
 
     def __init__(self,
                  state_space: List[float],
-                 distribution: tfd.Distribution,
                  mean: tf.Tensor,
-                 variances: tf.Tensor):
+                 scales: tf.Tensor,
+                 trainable: bool,
+                 dtype: tf.DType):
 
         super().__init__(state_space=state_space,
-                         distribution=distribution)
+                         distribution_kind=tfd.MultivariateNormalDiag,
+                         dtype=dtype)
 
         self.mean = mean
-        self.variances = variances
+        self.scales = scales
+        self.trainable = trainable
 
-    def sample(self) -> tf.Tensor:
-        pass
-
-    def add_training_data(self, x_train: tf.Tensor):
-        pass
+    def distribution(self) -> tfd.Distribution:
+        return self.distribution_kind(loc=self.mean, scale_diag=self.scales)
 
     def update(self):
-        pass
+
+        if self.trainable:
+
+            # Check that at least one datapoint is present
+            assert self.x_train.shape[0] > 0
+
+            self.mean = tf.reduce_mean(self.x_train, axis=0)
+            self.scales = tf.math.reduce_std(self.x_train, axis=0)
+
+        else:
+            warnings.warn("Attempted to update non-trainable initial "
+                          "distribution.")
+
