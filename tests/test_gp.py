@@ -96,6 +96,17 @@ def test_eq_cov():
 # ==============================================================================
 
 def test_vfe_gp_no_data():
+    """
+    Tests whether initialising with invalid parameters will throw the
+    appropriate errors. The cases tested are:
+
+        - Initialising with x_train data only
+        - Initialising with y_train data only
+        - Initialising with no training data and num_ind is not None.
+        - Initialising with no training data and calling VFEGP.free_energy()
+
+    :return:
+    """
 
     # Set random seed to run the same test always
     tf.random.set_seed(0)
