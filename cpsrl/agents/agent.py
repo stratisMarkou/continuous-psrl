@@ -32,7 +32,7 @@ class Agent(ABC):
         pass
 
     @abstractmethod
-    def update(self):
+    def update(self, **kwargs):
         """
         Method called after each episode and performs the updates required by
         the agent, such as retraining the models or updating the policy.

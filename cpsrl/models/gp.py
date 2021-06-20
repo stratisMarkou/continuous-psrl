@@ -52,7 +52,28 @@ class VFEGPStack(tf.keras.Model):
         
         for i, vfe_gp in enumerate(self.vfe_gps):
             vfe_gp.add_training_data(x_train, y_train[:, i:i+1])
-    
+
+    def reset_inducing(self, x_ind: tf.Tensor, num_ind: int) -> tf.Tensor:
+        """
+        Updates the inducing points of all the GP models in the stack.
+
+        If *x_ind* is specified, this tensor is used to specify the inducing
+        point locations. If *num_ind* is specified, then the model uses a
+        random subset of the training data of size *num_ind* as the initial
+        inducing point locations.
+
+        NOTE: If *num_ind* is used, the inducing points of each model will be
+        sampled individually, so each GP in the stack will have different
+        inducing points.
+
+        :param x_ind: optional, initial inducing point locations, shape (N, D)
+        :param num_ind: optional, number of inducing points to use
+        :return:
+        """
+
+        for vfe_gp in self.vfe_gps:
+            vfe_gp.reset_inducing(x_ind=x_ind, num_ind=num_ind)
+
     def sample_posterior(self, num_features: int) -> Callable:
         """
         Produces a posterior sample, using *num_features* random fourier
