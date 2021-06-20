@@ -3,6 +3,7 @@
 ## Infrastructure notes
 
 Things we would like to add to the codebase:
+* Adaptive number of inducing points
 * Modify GPs to use deltas
 * Change initial distribution handling to prior-posterior setup.
 * Add rng to various classes

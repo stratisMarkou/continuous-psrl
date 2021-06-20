@@ -68,6 +68,7 @@ class IndependentGaussian(InitialStateDistribution):
         self.scales = scales
         self.trainable = trainable
 
+    @property
     def distribution(self) -> tfd.Distribution:
         return self.distribution_kind(loc=self.mean, scale_diag=self.scales)
 

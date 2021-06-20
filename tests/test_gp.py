@@ -150,7 +150,7 @@ def test_vfe_gp_no_data():
     try:
         VFEGP(mean=mean,
               cov=cov,
-              state_dim=D,
+              input_dim=D,
               x_train=x_train,
               y_train=None,
               x_ind=x_ind,
@@ -169,7 +169,7 @@ def test_vfe_gp_no_data():
     try:
         VFEGP(mean=mean,
               cov=cov,
-              state_dim=D,
+              input_dim=D,
               x_train=None,
               y_train=y_train,
               x_ind=x_ind,
@@ -189,7 +189,7 @@ def test_vfe_gp_no_data():
 
         VFEGP(mean=mean,
               cov=cov,
-              state_dim=D,
+              input_dim=D,
               x_train=None,
               y_train=None,
               x_ind=None,
@@ -209,7 +209,7 @@ def test_vfe_gp_no_data():
 
         vfe_gp = VFEGP(mean=mean,
                        cov=cov,
-                       state_dim=D,
+                       input_dim=D,
                        x_train=None,
                        y_train=None,
                        x_ind=x_ind,
@@ -277,7 +277,7 @@ def test_vfe_gp_training():
     # Initialise Variational Free Energy GP
     vfe_gp = VFEGP(mean=mean,
                    cov=cov,
-                   state_dim=D,
+                   input_dim=D,
                    x_train=x_train,
                    y_train=y_train,
                    x_ind=None,

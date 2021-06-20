@@ -71,9 +71,7 @@ class GPPSRLAgent(Agent):
         self.dynamics_model.add_training_data(sa, s_)
         self.rewards_model.add_training_data(sas_, r)
 
-    def update(self,
-               num_ind_dyn: int,
-               num_ind_rew: int):
+    def update(self):
         """
         Method called after each episode and performs the following updates:
             - Updates the pseudopoints
@@ -82,8 +80,10 @@ class GPPSRLAgent(Agent):
         """
 
         # Update pseudopoints of the GP models
-        self.dynamics_model.reset_inducing(num_ind_dyn)
-        self.rewards_model.reset_inducing(num_ind_rew)
+        self.dynamics_model.reset_inducing(num_ind=self.update_params[
+                                               "num_ind_dyn"])
+        self.rewards_model.reset_inducing(num_ind=self.update_params[
+                                              "num_ind_rew"])
 
         # Train the initial distribution, dynamics and reward models
         self.initial_distribution.train()

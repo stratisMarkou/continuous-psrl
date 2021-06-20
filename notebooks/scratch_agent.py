@@ -1,6 +1,7 @@
 from cpsrl.models.mean import LinearMean
 from cpsrl.models.covariance import EQ
 from cpsrl.models.gp import VFEGP, VFEGPStack
+from cpsrl.models.initial_distributions import IndependentGaussian
 from cpsrl.agents.gppsrl import GPPSRLAgent
 from cpsrl.policies.policies import FCNPolicy
 
@@ -25,10 +26,10 @@ sa = tf.concat([s, a], axis=1)
 s0 = tf.random.uniform(shape=(R, S), dtype=dtype)
 
 # Trainable settings
-dyn_trainable_mean = False
+dyn_trainable_mean = True
 dyn_trainable_cov = False
 dyn_trainable_inducing = False
-dyn_trainable_noise = False
+dyn_trainable_noise = True
 
 # Covariance parameters
 dyn_log_coeff = -2.
@@ -50,7 +51,7 @@ dyn_covs = [EQ(log_coeff=dyn_log_coeff,
 
 dyn_vfe_gps = [VFEGP(mean=dyn_means[i],
                      cov=dyn_covs[i],
-                     state_dim=S+A,
+                     input_dim=S+A,
                      x_train=sa,
                      y_train=s_[:, i:i+1],
                      trainable_inducing=dyn_trainable_inducing,
@@ -63,13 +64,11 @@ dyn_vfe_gps = [VFEGP(mean=dyn_means[i],
 
 dyn_vfe_stack = VFEGPStack(vfe_gps=dyn_vfe_gps,
                            dtype=dtype)
-print(dyn_vfe_stack.trainable_variables)
-raise Exception
 
 # Trainable settings
 rew_trainable_mean = True
 rew_trainable_cov = False
-rew_trainable_inducing = True
+rew_trainable_inducing = False
 rew_trainable_noise = True
 
 # Covariance parameters
@@ -90,6 +89,7 @@ rew_cov = EQ(log_coeff=rew_log_coeff,
 
 rew_vfe_gp = VFEGP(mean=rew_mean,
                    cov=rew_cov,
+                   input_dim=S,
                    x_train=s,
                    y_train=r,
                    trainable_inducing=rew_trainable_inducing,
@@ -110,86 +110,39 @@ policy = FCNPolicy(hidden_sizes=hidden_sizes,
                    trainable=trainable_policy,
                    dtype=dtype)
 
+# Initial distribution parameters
+init_mean = -0.5 * tf.ones(shape=(S,), dtype=dtype)
+init_scales = tf.ones(shape=(S,), dtype=dtype)
+init_trainable = False
+
+initial_distribution = IndependentGaussian(state_space=state_space,
+                                           mean=init_mean,
+                                           scales=init_scales,
+                                           trainable=init_trainable,
+                                           dtype=dtype)
+
+update_params = {
+    "num_steps_dyn" : 10,
+    "learn_rate_dyn" : 1e-3,
+    "num_steps_rew" : 10,
+    "learn_rate_rew" : 1e-3,
+    "num_rollouts" : 20,
+    "num_features" : 200,
+    "num_steps_policy" : 100,
+    "learn_rate_policy" : 1e-3,
+    "num_ind_dyn" : 2,
+    "num_ind_rew" : 2
+}
+
 agent = GPPSRLAgent(action_space=action_space,
                     horizon=horizon,
                     gamma=gamma,
+                    update_params=update_params,
+                    initial_distribution=initial_distribution,
                     dynamics_model=dyn_vfe_stack,
                     rewards_model=rew_vfe_gp,
                     policy=policy,
                     dtype=dtype)
 
-print("# =====================================================================")
-print("# Training dynamics model")
-print("# =====================================================================")
-
-num_steps = 10
-optimiser = tf.optimizers.Adam(1e-1)
-
-for i in range(num_steps):
-    with tf.GradientTape() as tape:
-
-        tape.watch(dyn_vfe_stack.trainable_variables)
-        dyn_vfe = dyn_vfe_stack.free_energy()
-
-        loss = - dyn_vfe
-        print(loss)
-
-    dyn_grads = tape.gradient(loss,
-                              dyn_vfe_stack.trainable_variables)
-    optimiser.apply_gradients(zip(dyn_grads,
-                                  dyn_vfe_stack.trainable_variables))
-
-print("# =====================================================================")
-print("# Training rewards model")
-print("# =====================================================================")
-
-num_steps = 10
-optimiser = tf.optimizers.Adam(1e-1)
-
-for i in range(num_steps):
-    with tf.GradientTape() as tape:
-
-        tape.watch(rew_vfe_gp.trainable_variables)
-        rew_vfe = rew_vfe_gp.free_energy()
-
-        loss = - rew_vfe
-        print(loss)
-
-    rew_grads = tape.gradient(loss,
-                              rew_vfe_gp.trainable_variables)
-    optimiser.apply_gradients(zip(rew_grads,
-                                  rew_vfe_gp.trainable_variables))
-
-
-print("# =====================================================================")
-print("# Training policy")
-print("# =====================================================================")
-
-num_steps = 100
-num_features = 200
-optimiser = tf.optimizers.Adam(1e-3)
-
-dyn_sample = dyn_vfe_stack.sample_posterior(num_features=num_features)
-rew_sample = rew_vfe_gp.sample_posterior(num_features=num_features)
-
-for i in range(num_steps):
-    with tf.GradientTape() as tape:
-
-        tape.watch(policy.trainable_variables)
-
-        rollout = agent.rollout(dynamics_sample=dyn_sample,
-                                rewards_sample=rew_sample,
-                                horizon=horizon,
-                                gamma=gamma,
-                                s0=s0)
-
-        cumulative_reward, states, actions, next_states, rewards = rollout
-
-        loss = - tf.reduce_mean(cumulative_reward) / horizon
-        print(loss)
-
-    grads = tape.gradient(loss, policy.trainable_variables)
-    optimiser.apply_gradients(zip(grads, policy.trainable_variables))
-
-
+agent.update()
 
