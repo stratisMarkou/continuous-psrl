@@ -6,6 +6,7 @@ import numpy as np
 from cpsrl.models.mean import Mean
 from cpsrl.models.covariance import Covariance
 from cpsrl.helpers import check_shape
+from cpsrl.errors import ModelError
 
 
 # ==============================================================================
@@ -95,15 +96,15 @@ class VFEGP(tf.keras.Model):
     def __init__(self,
                  mean: Mean,
                  cov: Covariance,
-                 x_train: tf.Tensor,
-                 y_train: tf.Tensor,
                  trainable_inducing: bool,
                  log_noise: float,
                  trainable_noise: bool,
                  dtype: tf.DType,
+                 x_train: tf.Tensor = None,
+                 y_train: tf.Tensor = None,
                  x_ind: Optional[tf.Tensor] = None,
                  num_ind: Optional[int] = None,
-                 name='vfegp',
+                 name: str = 'vfegp',
                  **kwargs):
         """
         Gaussian Process model using the Variational Free Energy approximation
@@ -119,22 +120,19 @@ class VFEGP(tf.keras.Model):
 
         :param mean: mean function of the GP
         :param cov: covariance function of the GP
-        :param x_train: training inputs, shape (N, D)
-        :param y_train: training outputs, shape (N, 1)
         :param trainable_inducing: whether to allow inducing locations to train
         :param log_noise: log of noise of VFEGP
         :param trainable_noise: whether to allow the noise level to train
         :param dtype: data type of the GP model
+        :param x_train: training inputs, shape (N, D)
+        :param y_train: training outputs, shape (N, 1)
         :param x_ind: optional, initial inducing point locations
         :param num_ind: optional, number of inducing points to use
         :param name:
         :param kwargs:
         """
         super().__init__(name=name, dtype=dtype, **kwargs)
-        
-        # Check x_train and y_train have compatible shapes
-        check_shape([x_train, y_train], [('N', 'D'), ('N', '1')])
-        
+
         # Set training data and inducing point initialisation
         self.x_train = tf.zeros(shape=(0, x_train.shape[1]), dtype=dtype)
         self.y_train = tf.zeros(shape=(0, 1), dtype=dtype)
@@ -168,7 +166,10 @@ class VFEGP(tf.keras.Model):
         :param num_ind: optional, number of inducing points to use
         :return:
         """
-        
+
+        # Check model has data
+        self.check_training_data()
+
         assert ((x_ind is not None) and (num_ind is None)) or \
                ((x_ind is None) and (num_ind is not None))
         
@@ -198,14 +199,22 @@ class VFEGP(tf.keras.Model):
         :param y_train: new training outputs, shape (N, 1)
         :return:
         """
-        
-        # Check x_train and y_train have compatible shapes
-        check_shape([self.x_train, x_train, self.y_train, y_train],
-                    [('N1', 'D'), ('N2', 'D'), ('N1', '1'), ('N2', '1')])
-        
-        # Concatenate observed data and new data
-        self.x_train = tf.concat([self.x_train, x_train], axis=0)
-        self.y_train = tf.concat([self.y_train, y_train], axis=0)
+
+        if (x_train is not None) and (y_train is not None):
+
+            # Check x_train and y_train have compatible shapes
+            check_shape([self.x_train, x_train, self.y_train, y_train],
+                        [('N1', 'D'), ('N2', 'D'), ('N1', '1'), ('N2', '1')])
+
+            # Concatenate observed data and new data
+            self.x_train = tf.concat([self.x_train, x_train], axis=0)
+            self.y_train = tf.concat([self.y_train, y_train], axis=0)
+
+        elif not (x_train is None and y_train is None):
+
+            raise ModelError(f"Attempted to add data to model, but x_train "
+                             f"had type {type(x_train)} and y_train has type "
+                             f"{type(y_train)}.")
 
     @property
     def noise(self) -> tf.Tensor:
@@ -230,7 +239,17 @@ class VFEGP(tf.keras.Model):
 
         # Check input tensor shape
         check_shape([x_pred, self.x_train], [('K', 'D'), ('N', 'D')])
-        
+
+        # Prior mean and covariance
+        prior_mean = self.mean(self.x_train)
+        check_shape([prior_mean, self.x_train, self.y_train],
+                    [('N', 1), ('N', 'D'), ('N', 1)])
+        K_pred_pred = self.cov(x_pred, x_pred)
+
+        # If there's no training data, return the prior
+        if self.x_train.shape[0] == 0:
+            return prior_mean, K_pred_pred
+
         # Number of training points
         K = x_pred.shape[0]
         
@@ -239,16 +258,10 @@ class VFEGP(tf.keras.Model):
         K_ind_train = self.cov(self.x_ind, self.x_train)
         K_pred_ind = self.cov(x_pred, self.x_ind)
         K_ind_pred = self.cov(self.x_ind, x_pred)
-        K_pred_pred = self.cov(x_pred, x_pred)
-        
+
         # Compute intermediate matrices using Cholesky for numerical stability
         L, U, A, B, B_chol = self.compute_helper_matrices(K_ind_ind,
                                                           K_ind_train)
-        
-        # Compute mean
-        prior_mean = self.mean(self.x_train)
-        check_shape([prior_mean, self.x_train, self.y_train],
-                    [('N', 1), ('N', 'D'), ('N', 1)])
 
         # Compute posterior mean
         diff = self.y_train - prior_mean
@@ -277,7 +290,10 @@ class VFEGP(tf.keras.Model):
 
         :return:
         """
-        
+
+        # Check model has data
+        self.check_training_data()
+
         # Number of training points and inducing points
         N = self.y_train.shape[0]
 
@@ -339,6 +355,10 @@ class VFEGP(tf.keras.Model):
         
         # Draw a sample function from the RFF prior - rff_prior is a function
         rff_prior = self.cov.sample_rff(num_features)
+
+        # If there's no training data, return prior
+        if self.x_train.shape[0] == 0:
+            return rff_prior
 
         # Compute prior mean
         prior_train = self.mean(self.x_train)
@@ -422,3 +442,9 @@ class VFEGP(tf.keras.Model):
         B_chol = tf.linalg.cholesky(B)
         
         return L, U, A, B, B_chol
+
+    def check_training_data(self):
+
+        if self.x_train.shape[0] == 0:
+            raise ModelError("Attempted evaluating a posterior quantity while "
+                             "the model has no training data stored.")
