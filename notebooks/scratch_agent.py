@@ -25,10 +25,10 @@ sa = tf.concat([s, a], axis=1)
 s0 = tf.random.uniform(shape=(R, S), dtype=dtype)
 
 # Trainable settings
-dyn_trainable_mean = True
+dyn_trainable_mean = False
 dyn_trainable_cov = False
-dyn_trainable_inducing = True
-dyn_trainable_noise = True
+dyn_trainable_inducing = False
+dyn_trainable_noise = False
 
 # Covariance parameters
 dyn_log_coeff = -2.
@@ -50,6 +50,7 @@ dyn_covs = [EQ(log_coeff=dyn_log_coeff,
 
 dyn_vfe_gps = [VFEGP(mean=dyn_means[i],
                      cov=dyn_covs[i],
+                     state_dim=S+A,
                      x_train=sa,
                      y_train=s_[:, i:i+1],
                      trainable_inducing=dyn_trainable_inducing,
@@ -62,6 +63,8 @@ dyn_vfe_gps = [VFEGP(mean=dyn_means[i],
 
 dyn_vfe_stack = VFEGPStack(vfe_gps=dyn_vfe_gps,
                            dtype=dtype)
+print(dyn_vfe_stack.trainable_variables)
+raise Exception
 
 # Trainable settings
 rew_trainable_mean = True

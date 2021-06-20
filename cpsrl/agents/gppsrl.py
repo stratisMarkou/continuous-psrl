@@ -24,6 +24,7 @@ class GPPSRLAgent(Agent):
                  dynamics_model: VFEGPStack,
                  rewards_model: VFEGP,
                  policy: Policy,
+                 update_params: dict,
                  dtype: tf.DType):
         """
         PSRL agent using Gaussian Processes for the dynamics and rewards models.
@@ -34,6 +35,7 @@ class GPPSRLAgent(Agent):
         :param dynamics_model: dynamics model, collection of independent GPs
         :param rewards_model: rewards model, single GP modelling the rewards
         :param policy: policy to use
+        :param update_params: parameters required in the update step
         :param dtype: data type of the agent, tf.float32 or tf.float64
         """
 
@@ -48,8 +50,9 @@ class GPPSRLAgent(Agent):
         self.rewards_model = rewards_model
         self.policy = policy
 
-        # Set dtype
+        # Set dtype and training parameters for models
         self.dtype = dtype
+        self.update_params = update_params
 
     def act(self, state: ArrayOrTensor) -> tf.Tensor:
 
@@ -68,7 +71,9 @@ class GPPSRLAgent(Agent):
         self.dynamics_model.add_training_data(sa, s_)
         self.rewards_model.add_training_data(sas_, r)
 
-    def update(self, num_ind_dyn: int, num_ind_rew: int):
+    def update(self,
+               num_ind_dyn: int,
+               num_ind_rew: int):
         """
         Method called after each episode and performs the following updates:
             - Updates the pseudopoints
@@ -82,14 +87,44 @@ class GPPSRLAgent(Agent):
 
         # Train the initial distribution, dynamics and reward models
         self.initial_distribution.train()
-        # self.dynamics_model.train()
-        # self.rewards_model.train()
+
+        self.train_model(self.dynamics_model,
+                         num_steps=self.update_params["num_steps_dyn"],
+                         learn_rate=self.update_params["learn_rate_dyn"])
+
+        self.train_model(self.rewards_model,
+                         num_steps=self.update_params["num_steps_rew"],
+                         learn_rate=self.update_params["learn_rate_rew"])
 
         # Optimise the policy
-        self.optimise_policy(num_rollouts=num_rollouts,
-                             num_features=num_features,
-                             num_steps=num_steps,
-                             learn_rate=learn_rate)
+        self.optimise_policy(num_rollouts=self.update_params["num_rollouts"],
+                             num_features=self.update_params["num_features"],
+                             num_steps=self.update_params["num_steps_policy"],
+                             learn_rate=self.update_params["learn_rate_policy"])
+
+    def train_model(self,
+                    model: Union[VFEGP, VFEGPStack],
+                    num_steps: int,
+                    learn_rate: float):
+
+        if model.trainable_variables == []:
+            raise AgentError("Attempted to train model with no trainable "
+                             "parameters.")
+
+        # Initialise optimiser
+        optimizer = tf.optimizers.Adam(learn_rate)
+
+        for i in range(num_steps):
+            with tf.GradientTape() as tape:
+
+                # Ensure policy variables are being watched
+                tape.watch(model.trainable_variables)
+
+                loss = - model.free_energy()
+
+            # Compute gradients wrt policy variables and apply gradient step
+            gradients = tape.gradient(loss, model.trainable_variables)
+            optimizer.apply_gradients(zip(gradients, model.trainable_variables))
 
     def optimise_policy(self,
                         num_rollouts: int,
