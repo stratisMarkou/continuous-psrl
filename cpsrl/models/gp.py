@@ -96,6 +96,7 @@ class VFEGP(tf.keras.Model):
     def __init__(self,
                  mean: Mean,
                  cov: Covariance,
+                 state_dim: int,
                  trainable_inducing: bool,
                  log_noise: float,
                  trainable_noise: bool,
@@ -120,6 +121,7 @@ class VFEGP(tf.keras.Model):
 
         :param mean: mean function of the GP
         :param cov: covariance function of the GP
+        :param state_dim: dimension of the state space
         :param trainable_inducing: whether to allow inducing locations to train
         :param log_noise: log of noise of VFEGP
         :param trainable_noise: whether to allow the noise level to train
@@ -134,13 +136,13 @@ class VFEGP(tf.keras.Model):
         super().__init__(name=name, dtype=dtype, **kwargs)
 
         # Set training data and inducing point initialisation
-        self.x_train = tf.zeros(shape=(0, x_train.shape[1]), dtype=dtype)
+        self.x_train = tf.zeros(shape=(0, state_dim), dtype=dtype)
         self.y_train = tf.zeros(shape=(0, 1), dtype=dtype)
         
         self.add_training_data(x_train, y_train)
         
         # Initialise inducing points
-        self.x_ind = self.init_inducing(x_ind, num_ind)
+        self.x_ind = self.reset_inducing(x_ind, num_ind)
         self.x_ind = tf.Variable(self.x_ind, trainable=trainable_inducing)
         
         # Set mean and covariance functions
@@ -151,7 +153,7 @@ class VFEGP(tf.keras.Model):
         self.log_noise = tf.convert_to_tensor(log_noise, dtype=dtype)
         self.log_noise = tf.Variable(self.log_noise, trainable=trainable_noise)
         
-    def init_inducing(self, x_ind: tf.Tensor, num_ind: int) -> tf.Tensor:
+    def reset_inducing(self, x_ind: tf.Tensor, num_ind: int) -> tf.Tensor:
         """
         Creates a tensor containing the initial inducing point locations.
         Assumes exactly one of *x_ind* or *num_ind* is specified,
@@ -167,12 +169,9 @@ class VFEGP(tf.keras.Model):
         :return:
         """
 
-        # Check model has data
-        self.check_training_data()
-
         assert ((x_ind is not None) and (num_ind is None)) or \
                ((x_ind is None) and (num_ind is not None))
-        
+
         # Set inducing points either to initial locations or on training data
         if x_ind is not None:
 
@@ -182,10 +181,14 @@ class VFEGP(tf.keras.Model):
             x_ind = tf.convert_to_tensor(x_ind, dtype=self.dtype)
             
         else:
+
+            # Check if model has training data
+            self.check_training_data()
+
+            # Choose inducing to be random subset of training points
             ind_idx = np.random.choice(np.arange(self.x_train.shape[0]),
                                        size=(num_ind,),
                                        replace=False)
-
             x_ind = tf.convert_to_tensor(self.x_train.numpy()[ind_idx],
                                          dtype=self.dtype)
             
@@ -444,6 +447,8 @@ class VFEGP(tf.keras.Model):
         return L, U, A, B, B_chol
 
     def check_training_data(self):
+
+        print(self.x_train.shape)
 
         if self.x_train.shape[0] == 0:
             raise ModelError("Attempted evaluating a posterior quantity while "

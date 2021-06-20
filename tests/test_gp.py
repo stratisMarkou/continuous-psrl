@@ -3,6 +3,7 @@ from cpsrl.models.mean import ConstantMean, LinearMean
 from cpsrl.models.covariance import EQ
 from cpsrl.models.gp import VFEGP, VFEGPStack
 from cpsrl.helpers import check_shape
+from cpsrl.errors import ModelError
 
 DTYPE = tf.float64
 
@@ -89,8 +90,133 @@ def test_eq_cov():
     check_shape([x1, x2, cov],
                 [(N1, D), (N2, D), (N1, N2)])
 
+
 # ==============================================================================
-# Test forward pass through covariance
+# Test VFEGP trains and handles the zero data case
+# ==============================================================================
+
+def test_vfe_gp_no_data():
+
+    # Set random seed to run the same test always
+    tf.random.set_seed(0)
+
+    # Number of datapoints and input dimension
+    N = 1000
+    D = 1
+
+    # Set all parameters to trainable
+    trainable_mean = False
+    trainable_cov = False
+    trainable_noise = False
+    trainable_inducing = False
+
+    log_coeff = -6.
+    log_scales = D * [2.]
+    log_noise = 0.
+    num_ind = 10
+    x_ind = tf.random.uniform((num_ind, D), dtype=DTYPE)
+
+    # Draw random data
+    x_train = tf.random.uniform(shape=(N, D),
+                                dtype=DTYPE)
+
+    y_train = tf.random.normal(mean=0.,
+                               stddev=1.,
+                               shape=(N, 1),
+                               dtype=DTYPE)
+
+    # Initialise mean and covariance
+    mean = ConstantMean(input_dim=D,
+                        trainable=trainable_mean,
+                        dtype=DTYPE)
+
+    cov = EQ(log_coeff=log_coeff,
+             log_scales=log_scales,
+             trainable=trainable_cov,
+             dtype=DTYPE)
+
+    # Initialising using only x_train should throw error
+    try:
+        VFEGP(mean=mean,
+              cov=cov,
+              state_dim=D,
+              x_train=x_train,
+              y_train=None,
+              x_ind=x_ind,
+              num_ind=None,
+              trainable_inducing=trainable_inducing,
+              log_noise=log_noise,
+              trainable_noise=trainable_noise,
+              dtype=DTYPE)
+
+        raise Exception
+
+    except ModelError:
+        pass
+
+    # Initialising using only y_train should throw error
+    try:
+        VFEGP(mean=mean,
+              cov=cov,
+              state_dim=D,
+              x_train=None,
+              y_train=y_train,
+              x_ind=x_ind,
+              num_ind=None,
+              trainable_inducing=trainable_inducing,
+              log_noise=log_noise,
+              trainable_noise=trainable_noise,
+              dtype=DTYPE)
+
+        raise Exception
+
+    except ModelError:
+        pass
+
+    # Initialising with no data using num_ind should raise error
+    try:
+
+        VFEGP(mean=mean,
+              cov=cov,
+              state_dim=D,
+              x_train=None,
+              y_train=None,
+              x_ind=None,
+              num_ind=num_ind,
+              trainable_inducing=trainable_inducing,
+              log_noise=log_noise,
+              trainable_noise=trainable_noise,
+              dtype=DTYPE)
+
+        raise Exception
+
+    except ModelError:
+        pass
+
+    # Evaluating the free energy with no training data should throw error
+    try:
+
+        vfe_gp = VFEGP(mean=mean,
+                       cov=cov,
+                       state_dim=D,
+                       x_train=None,
+                       y_train=None,
+                       x_ind=x_ind,
+                       num_ind=None,
+                       trainable_inducing=trainable_inducing,
+                       log_noise=log_noise,
+                       trainable_noise=trainable_noise,
+                       dtype=DTYPE)
+
+        vfe_gp.free_energy()
+
+        raise Exception
+
+    except ModelError:
+        pass
+
+# ==============================================================================
+# Test VFEGP trains
 # ==============================================================================
 
 def test_vfe_gp_training():
@@ -140,6 +266,7 @@ def test_vfe_gp_training():
     # Initialise Variational Free Energy GP
     vfe_gp = VFEGP(mean=mean,
                    cov=cov,
+                   state_dim=D,
                    x_train=x_train,
                    y_train=y_train,
                    x_ind=None,
