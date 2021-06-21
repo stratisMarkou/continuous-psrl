@@ -1,5 +1,5 @@
 import numpy as np
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 from abc import ABC, abstractmethod
 
@@ -13,8 +13,8 @@ class Agent(ABC):
 
     def __init__(self,
                  action_space: List[Tuple[float, float]],
-                 gamma: float,
-                 horizon: int = None):
+                 gamma: Optional[float],
+                 horizon: Optional[int]):
 
         self.action_space = action_space
         self.gamma = gamma
@@ -65,7 +65,7 @@ class RandomAgent(Agent):
                  action_space: List[Tuple[float, float]],
                  rng: np.random.Generator):
 
-        super().__init__(action_space, gamma=None)
+        super().__init__(action_space, gamma=None, horizon=None)
         self.rng = rng
 
     def act(self, state: np.ndarray) -> np.ndarray:
