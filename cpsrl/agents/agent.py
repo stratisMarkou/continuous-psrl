@@ -2,6 +2,7 @@ import numpy as np
 from typing import List, Tuple, Optional
 
 from abc import ABC, abstractmethod
+from cpsrl.train_utils import Transition
 
 
 # =============================================================================
@@ -40,14 +41,14 @@ class Agent(ABC):
         pass
 
     @abstractmethod
-    def observe(self, episode: List[Tuple]):
+    def observe(self, episode: List[Transition]):
         """
         Method called after each episode, which adds the data contained in
         *episode* to the dataset held by the agent.
 
-        :param episode: List of tuples each of length 4. Each tuple contains
-        np.ndarrays representing the state s, action a, next state s_ and
-        reward r of an single interaction, in the format
+        :param episode: List of Transition each of length 4. Each Transition
+        contains np.ndarrays representing the state s, action a, next state
+        s_ and reward r of an single interaction, in the format
 
             episode = [(s, a, s_, r), ..., (s, a, s_, r)].
 
@@ -72,7 +73,7 @@ class RandomAgent(Agent):
         return np.array([self.rng.uniform(lo, hi)
                          for lo, hi in self.action_space])
 
-    def observe(self, episode: List[Tuple]):
+    def observe(self, episode: List[Transition]):
         pass
 
     def update(self):
