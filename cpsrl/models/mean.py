@@ -74,4 +74,4 @@ class LinearMean(Mean):
 
         check_shape(x, (-1, self.input_dim))
 
-        return tf.matmul(x, self.coefficients) + self.constant
+        return x @ self.coefficients + self.constant
