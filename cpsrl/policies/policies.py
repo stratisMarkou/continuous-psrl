@@ -40,15 +40,12 @@ class RandomPolicy(Policy):
 
     def __call__(self, state: tf.Tensor) -> tf.Tensor:
 
-        state = 1e-3 * tf.reduce_sum(state, axis=1, keepdims=True)
-
         action = [tf.random.uniform(minval=low,
                                     maxval=high,
                                     shape=(state.shape[0],),
                                     dtype=self.dtype)
                   for low, high in self.action_space]
         action = tf.stack(action, axis=1)
-        action = action + state
 
         return action
 
