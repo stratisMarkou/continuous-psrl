@@ -1,7 +1,10 @@
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from abc import ABC, abstractmethod
 
 import numpy as np
+
+from cpsrl.agents import Agent
+from cpsrl.train_utils import play_episode, Transition
 
 # =============================================================================
 # Base environment class
@@ -64,3 +67,30 @@ class Environment(ABC):
         self.state = next_state
 
         return next_state, reward
+
+    def plot(self,
+             agent: Agent,
+             num_trajectories: Optional[int] = None,
+             init_states: Optional[List[np.ndarray]] = None,
+             **plot_kwargs):
+
+        if ((num_trajectories is None and init_states is None)
+                or (num_trajectories is not None and init_states is not None)):
+            raise ValueError("One of {num_trajectories, init_states}"
+                             " should not be None.")
+
+        if num_trajectories is not None:
+            init_states = [self.reset() for _ in range(num_trajectories)]
+
+        trajectories = []
+        for init_state in init_states:
+            _, trajectory = play_episode(agent=agent,
+                                         environment=self,
+                                         init_state=init_state)
+            trajectories.append(trajectory)
+
+        self.plot_trajectories(trajectories, **plot_kwargs)
+
+    @abstractmethod
+    def plot_trajectories(self, trajectories: List[List[Transition]], **plot_kwargs):
+        pass
