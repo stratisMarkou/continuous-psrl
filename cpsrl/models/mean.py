@@ -16,7 +16,7 @@ class Mean(tf.keras.Model):
         super().__init__(name=name, dtype=dtype)
 
     @abstractmethod
-    def __call__(self, x: tf.Tensor):
+    def __call__(self, x: tf.Tensor) -> tf.Tensor:
         pass
 
 
@@ -38,7 +38,7 @@ class ConstantMean(Mean):
         self.constant = tf.Variable(tf.constant(0., dtype=dtype),
                                     trainable=trainable)
         
-    def __call__(self, x: tf.Tensor):
+    def __call__(self, x: tf.Tensor) -> tf.Tensor:
 
         check_shape(x, (-1, self.input_dim))
 
@@ -70,7 +70,7 @@ class LinearMean(Mean):
                                              dtype=dtype),
                                     trainable=trainable)
 
-    def __call__(self, x: tf.Tensor):
+    def __call__(self, x: tf.Tensor) -> tf.Tensor:
 
         check_shape(x, (-1, self.input_dim))
 
