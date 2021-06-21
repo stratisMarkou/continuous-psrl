@@ -114,8 +114,8 @@ class FCNPolicy(Policy, tf.keras.Model):
 
             # If  at last layer, apply sine and scale to action range
             else:
-                tensor = tf.sin(tensor)
-                tensor = tensor + self.action_ranges[None, :]
+                tensor = tf.math.tanh(tensor)
+                tensor = tensor * self.action_ranges[None, :]
                 tensor = tensor + self.action_centers
 
         return tensor
