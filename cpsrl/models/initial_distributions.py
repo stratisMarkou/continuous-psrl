@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Tuple
 import warnings
 
 from cpsrl.helpers import check_shape
@@ -16,7 +16,7 @@ tfd = tfp.distributions
 class InitialStateDistribution(ABC):
 
     def __init__(self,
-                 state_space: List[float],
+                 state_space: List[Tuple[float, float]],
                  distribution_kind: tfd.distribution._DistributionMeta,
                  dtype: tf.DType):
 
@@ -42,7 +42,7 @@ class InitialStateDistribution(ABC):
 
     def add_training_data(self, init_states: tf.Tensor):
 
-        check_shape(init_states, ('N', self.S))
+        check_shape(init_states, (-1, self.S))
 
         self.x_train = tf.concat([self.x_train, init_states], axis=0)
 
@@ -54,7 +54,7 @@ class InitialStateDistribution(ABC):
 class IndependentGaussian(InitialStateDistribution):
 
     def __init__(self,
-                 state_space: List[float],
+                 state_space: List[Tuple[float, float]],
                  mean: tf.Tensor,
                  scales: tf.Tensor,
                  trainable: bool,

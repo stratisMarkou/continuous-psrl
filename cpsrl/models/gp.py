@@ -1,11 +1,11 @@
-from typing import Tuple, List, Callable, Optional
+from typing import Tuple, List, Callable, Optional, Union
 
 import tensorflow as tf
 import numpy as np
 
 from cpsrl.models.mean import Mean
 from cpsrl.models.covariance import Covariance
-from cpsrl.helpers import check_shape
+from cpsrl.helpers import check_shape, SampleCallable
 from cpsrl.errors import ModelError
 
 
@@ -17,7 +17,7 @@ from cpsrl.errors import ModelError
 class VFEGPStack(tf.keras.Model):
     
     def __init__(self,
-                 vfe_gps: List,
+                 vfe_gps: List['VFEGP'],
                  dtype: tf.DType,
                  name: str = 'gp_stack',
                  **kwargs):
@@ -53,9 +53,7 @@ class VFEGPStack(tf.keras.Model):
         for i, vfe_gp in enumerate(self.vfe_gps):
             vfe_gp.add_training_data(x_train, y_train[:, i:i+1])
 
-    def reset_inducing(self,
-                       x_ind: tf.Tensor = None,
-                       num_ind: int = None) -> tf.Tensor:
+    def reset_inducing(self, x_ind: tf.Tensor = None, num_ind: int = None):
         """
         Updates the inducing points of all the GP models in the stack.
 
@@ -76,7 +74,7 @@ class VFEGPStack(tf.keras.Model):
         for vfe_gp in self.vfe_gps:
             vfe_gp.reset_inducing(x_ind=x_ind, num_ind=num_ind)
 
-    def sample_posterior(self, num_features: int) -> Callable:
+    def sample_posterior(self, num_features: int) -> Union[Callable, SampleCallable]:
         """
         Produces a posterior sample, using *num_features* random fourier
         features, returning the sample in the form of a Callable with signature:
@@ -252,7 +250,7 @@ class VFEGP(tf.keras.Model):
         """
         return tf.math.exp(self.log_noise)
 
-    def post_pred(self, x_pred: tf.Tensor) -> List[tf.Tensor]:
+    def post_pred(self, x_pred: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
         """
         Computes the predictive posterior of the VFE GP model in a
         numerically stable way, returning the mean vector and covariance
@@ -280,6 +278,7 @@ class VFEGP(tf.keras.Model):
 
         # Number of training points
         K = x_pred.shape[0]
+        noise = tf.squeeze(self.noise)
         
         # Compute covariance terms
         K_ind_ind = self.cov(self.x_ind, self.x_ind, epsilon=1e-9)
@@ -297,13 +296,13 @@ class VFEGP(tf.keras.Model):
         beta = tf.linalg.triangular_solve(tf.transpose(L, (1, 0)),
                                           beta,
                                           lower=False)
-        mean = tf.matmul(K_pred_ind / self.noise ** 2, beta)[:, 0]
+        mean = (K_pred_ind / noise ** 2 @ beta)[:, 0]
         
         # Compute posterior covariance
         C = tf.linalg.triangular_solve(L, K_ind_pred)
         D = tf.linalg.triangular_solve(B_chol, C)
         
-        cov = K_pred_pred + self.noise ** 2 * tf.eye(K, dtype=self.dtype)
+        cov = K_pred_pred + tf.squeeze(self.noise) ** 2 * tf.eye(K, dtype=self.dtype)
         cov = cov - tf.matmul(C, C, transpose_a=True)
         cov = cov + tf.matmul(D, D, transpose_a=True)
         
@@ -324,6 +323,7 @@ class VFEGP(tf.keras.Model):
 
         # Number of training points and inducing points
         N = self.y_train.shape[0]
+        noise = tf.squeeze(self.noise)
 
         # Compute covariance terms
         K_ind_ind = self.cov(self.x_ind, self.x_ind, epsilon=1e-9)
@@ -337,7 +337,7 @@ class VFEGP(tf.keras.Model):
         # Compute log-normalising constant of the matrix
         log_pi = - N / 2 * tf.math.log(tf.constant(2 * np.pi, dtype=self.dtype))
         log_det_B = - tf.reduce_sum(tf.math.log(tf.linalg.diag_part(B_chol)))
-        log_det_noise = - N / 2 * tf.math.log(self.noise ** 2)
+        log_det_noise = - N / 2 * tf.math.log(noise ** 2)
         
         # Log of determinant of normalising term
         log_det = log_pi + log_det_B + log_det_noise
@@ -351,19 +351,19 @@ class VFEGP(tf.keras.Model):
         diff = self.y_train - prior_mean
         c = tf.linalg.triangular_solve(B_chol,
                                        tf.matmul(A, diff),
-                                       lower=True) / self.noise
-        quad = - 0.5 * tf.reduce_sum(diff ** 2) / self.noise ** 2
+                                       lower=True) / noise
+        quad = - 0.5 * tf.reduce_sum(diff ** 2) / noise ** 2
         quad = quad + 0.5 * tf.reduce_sum(c ** 2)
         
         # Compute trace term
-        trace = - 0.5 * tf.reduce_sum(K_train_train_diag) / self.noise ** 2
+        trace = - 0.5 * tf.reduce_sum(K_train_train_diag) / noise ** 2
         trace = trace + 0.5 * tf.linalg.trace(tf.matmul(A, A, transpose_b=True))
         
         free_energy = (log_det + quad + trace) / N
         
         return free_energy
         
-    def sample_posterior(self, num_features: int) -> Callable:
+    def sample_posterior(self, num_features: int) -> Union[Callable, SampleCallable]:
         """
         Produces a posterior sample, using *num_features* random fourier
         features, returning the sample in the form of a Callable with signature:
@@ -380,6 +380,7 @@ class VFEGP(tf.keras.Model):
 
         # Number of inducing points
         M = self.x_ind.shape[0]
+        noise = tf.squeeze(self.noise)
         
         # Draw a sample function from the RFF prior - rff_prior is a function
         rff_prior = self.cov.sample_rff(num_features)
@@ -404,7 +405,7 @@ class VFEGP(tf.keras.Model):
 
         # Compute mean of VFE posterior over inducing values
         diff = self.y_train - prior_train
-        u_mean = self.noise ** -2 * \
+        u_mean = noise ** -2 * \
                  L @ tf.linalg.cholesky_solve(B_chol, U @ diff)
         u_mean = u_mean + prior_ind
 
@@ -437,9 +438,8 @@ class VFEGP(tf.keras.Model):
         
         return post_sample
 
-    def compute_helper_matrices(self,
-                                K_ind_ind: tf.Tensor,
-                                K_ind_train: tf.Tensor) -> Tuple[tf.Tensor]:
+    def compute_helper_matrices(self, K_ind_ind: tf.Tensor, K_ind_train: tf.Tensor) \
+            -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
         """
         Computes matrices used by other methods of this class,
         for numerically stable calculations.

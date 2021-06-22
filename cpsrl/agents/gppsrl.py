@@ -1,12 +1,9 @@
-from typing import List, Tuple, Callable
-
 from cpsrl.policies.policies import Policy
 from cpsrl.agents.agent import Agent
 from cpsrl.models.gp import VFEGP, VFEGPStack
 from cpsrl.models.initial_distributions import InitialStateDistribution
 from cpsrl.errors import AgentError
 from cpsrl.helpers import *
-from cpsrl.train_utils import Transition
 
 import tensorflow as tf
 
@@ -58,8 +55,12 @@ class GPPSRLAgent(Agent):
     def act(self, state: ArrayOrTensor) -> tf.Tensor:
 
         state = tf.convert_to_tensor(state, dtype=self.dtype)
+        if state.ndim == 1:
+            state = tf.expand_dims(state, axis=0)
 
-        return self.policy(state)
+        action = self.policy(state)
+        action = tf.squeeze(action, axis=0)
+        return action
 
     def observe(self, episode: List[Transition]):
 
@@ -68,9 +69,9 @@ class GPPSRLAgent(Agent):
                                                         dtype=self.dtype)
 
         # Update the models' training data
-        self.initial_distribution.add_training_data(s)
+        self.initial_distribution.add_training_data(s[0:1])
         self.dynamics_model.add_training_data(sa, s_)
-        self.rewards_model.add_training_data(sas_, r)
+        self.rewards_model.add_training_data(s, r)
 
     def update(self):
         """
@@ -81,10 +82,10 @@ class GPPSRLAgent(Agent):
         """
 
         # Update pseudopoints of the GP models
-        self.dynamics_model.reset_inducing(num_ind=self.update_params[
-                                               "num_ind_dyn"])
-        self.rewards_model.reset_inducing(num_ind=self.update_params[
-                                              "num_ind_rew"])
+        num_ind_dyn = self.update_params["num_ind_dyn"]
+        num_ind_rew = self.update_params["num_ind_rew"]
+        self.dynamics_model.reset_inducing(num_ind=num_ind_dyn)
+        self.rewards_model.reset_inducing(num_ind=num_ind_rew)
 
         # Train the initial distribution, dynamics and reward models
         self.initial_distribution.train()
@@ -117,7 +118,6 @@ class GPPSRLAgent(Agent):
 
         for i in range(num_steps):
             with tf.GradientTape() as tape:
-
                 # Ensure policy variables are being watched
                 tape.watch(model.trainable_variables)
 
@@ -152,7 +152,6 @@ class GPPSRLAgent(Agent):
 
         for i in range(num_steps):
             with tf.GradientTape() as tape:
-
                 # Ensure policy variables are being watched
                 tape.watch(self.policy.trainable_variables)
 
@@ -178,11 +177,12 @@ class GPPSRLAgent(Agent):
                                           self.policy.trainable_variables))
 
     def rollout(self,
-                dynamics_sample: Callable[[tf.Tensor], tf.Tensor],
-                rewards_sample: Callable[[tf.Tensor], tf.Tensor],
+                dynamics_sample: SampleCallable,
+                rewards_sample: SampleCallable,
                 horizon: int,
                 s0: tf.Tensor,
-                gamma: float) -> Tuple[tf.Tensor]:
+                gamma: float) \
+            -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
         """
         Performs Monte Carlo rollouts, using a posterior sample of the dynamics
         and a posterior sample of the rewards models, for a length of *horizon*,
@@ -210,13 +210,12 @@ class GPPSRLAgent(Agent):
         # Arrays for storing rollouts
         states = []
         actions = []
-        next_states = []
         rewards = []
+        next_states = []
 
         cumulative_reward = tf.zeros(shape=(R,), dtype=self.dtype)
 
         for i in range(horizon):
-
             # Get action from the policy
             a = self.policy(s)
 
@@ -239,8 +238,8 @@ class GPPSRLAgent(Agent):
             # Store states, actions and rewards
             states.append(s)
             actions.append(a)
-            next_states.append(s_)
             rewards.append(r)
+            next_states.append(s_)
 
             # Increment cumulative reward and update state
             cumulative_reward = cumulative_reward + (gamma ** i) * r
@@ -248,8 +247,7 @@ class GPPSRLAgent(Agent):
 
         states = tf.stack(states, axis=1)
         actions = tf.stack(actions, axis=1)
-        next_states = tf.stack(next_states, axis=1)
         rewards = tf.stack(rewards, axis=1)
+        next_states = tf.stack(next_states, axis=1)
 
-        return cumulative_reward, states, actions, next_states, rewards
-
+        return cumulative_reward, states, actions, rewards, next_states

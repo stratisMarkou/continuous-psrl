@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from collections import namedtuple
 from typing import Tuple, List, Optional, TYPE_CHECKING
 
 import numpy as np
 
+from cpsrl.helpers import Transition
+
 if TYPE_CHECKING:  # avoid circular imports
     from cpsrl.agents import Agent
     from cpsrl.environments import Environment
-
-Transition = namedtuple("Transition", ("obs", "action", "reward", "next_obs"))
 
 # =============================================================================
 # Helper for rollout out one episode
@@ -35,7 +34,7 @@ def play_episode(agent: Agent,
         next_state, reward = environment.step(action)
 
         cumulative_reward += reward
-        episode.append(Transition(state, action, next_state, reward))
+        episode.append(Transition(state, action, reward, next_state))
         state = next_state
 
         if environment.done: break
