@@ -8,6 +8,7 @@ from cpsrl.errors import EnvironmentError
 from cpsrl.train_utils import Transition
 from cpsrl.helpers import check_shape
 
+
 # =============================================================================
 # MountainCar environment
 # =============================================================================
@@ -24,7 +25,10 @@ class MountainCar(Environment):
                  sub_sampling_factor: int = 1,
                  goal_pos: float = 0.5,
                  goal_scale: float = 1.0):
-        super().__init__(horizon=100, rng=rng, sub_sampling_factor=sub_sampling_factor)
+
+        super().__init__(horizon=100,
+                         rng=rng,
+                         sub_sampling_factor=sub_sampling_factor)
 
         self.reward_loc = np.array([goal_pos, 0.])
         self.reward_scale = np.array([goal_scale, goal_scale])
