@@ -23,7 +23,7 @@ class InitialStateDistribution(ABC):
         # Set state space and distribution, state space constraints not enforced
         self.state_space = state_space
         self.distribution_kind = distribution_kind
-        self.S  = len(state_space)
+        self.S = len(state_space)
 
         # Set training data and data type
         self.x_train = tf.zeros(shape=(0, len(state_space)), dtype=dtype)
@@ -42,7 +42,7 @@ class InitialStateDistribution(ABC):
 
     def add_training_data(self, x_train: tf.Tensor):
 
-        check_shape(x_train, ('N', len(self.state_space)))
+        check_shape(x_train, ('N', self.S))
 
         self.x_train = tf.concat([self.x_train, x_train], axis=0)
 
