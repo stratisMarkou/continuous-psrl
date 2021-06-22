@@ -40,11 +40,11 @@ class InitialStateDistribution(ABC):
     def sample(self, num_samples) -> tf.Tensor:
         return self.distribution.sample(sample_shape=(num_samples,))
 
-    def add_training_data(self, x_train: tf.Tensor):
+    def add_training_data(self, init_states: tf.Tensor):
 
-        check_shape(x_train, ('N', self.S))
+        check_shape(init_states, ('N', self.S))
 
-        self.x_train = tf.concat([self.x_train, x_train], axis=0)
+        self.x_train = tf.concat([self.x_train, init_states], axis=0)
 
 
 # ==============================================================================
