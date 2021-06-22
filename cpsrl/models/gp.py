@@ -1,4 +1,4 @@
-from typing import List, Callable, Optional
+from typing import Tuple, List, Callable, Optional
 
 import tensorflow as tf
 import numpy as np
@@ -363,7 +363,7 @@ class VFEGP(tf.keras.Model):
         
         return free_energy
         
-    def sample_posterior(self, num_features: int):
+    def sample_posterior(self, num_features: int) -> Callable:
         """
         Produces a posterior sample, using *num_features* random fourier
         features, returning the sample in the form of a Callable with signature:
@@ -439,7 +439,7 @@ class VFEGP(tf.keras.Model):
 
     def compute_helper_matrices(self,
                                 K_ind_ind: tf.Tensor,
-                                K_ind_train: tf.Tensor) -> List[tf.Tensor]:
+                                K_ind_train: tf.Tensor) -> Tuple[tf.Tensor]:
         """
         Computes matrices used by other methods of this class,
         for numerically stable calculations.
