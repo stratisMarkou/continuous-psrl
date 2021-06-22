@@ -228,7 +228,7 @@ class GPPSRLAgent(Agent):
 
             # Get next state and rewards from the model samples
             s_ = dynamics_sample(sa, add_noise=True)
-            r = rewards_sample(s, add_noise=True)
+            r = rewards_sample(s_, add_noise=True)
 
             # Check shapes of next state and rewards
             check_shape([s, s_, r], [(R, S), (R, S), (R, 1)])
