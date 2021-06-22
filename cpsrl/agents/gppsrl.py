@@ -6,6 +6,7 @@ from cpsrl.models.gp import VFEGP, VFEGPStack
 from cpsrl.models.initial_distributions import InitialStateDistribution
 from cpsrl.errors import AgentError
 from cpsrl.helpers import *
+from cpsrl.train_utils import Transition
 
 import tensorflow as tf
 
@@ -60,7 +61,7 @@ class GPPSRLAgent(Agent):
 
         return self.policy(state)
 
-    def observe(self, episode: List[Tuple]):
+    def observe(self, episode: List[Transition]):
 
         # Convert episode to tensors, to update the models' training data
         s, sa, s_, sas_, r = convert_episode_to_tensors(episode,
