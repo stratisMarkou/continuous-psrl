@@ -83,7 +83,7 @@ def check_admissible(array: ArrayOrTensor,
     check = all([a1 <= a <= a2 for a, (a1, a2) in zip(array, admissible_box)])
 
     if not check:
-        raise ShapeError(f"Array shape {array.shape} not in admissible box "
+        raise ValueError(f"Array {array} not in admissible box "
                          f"{admissible_box}.")
 
 
