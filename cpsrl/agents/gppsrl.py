@@ -182,7 +182,7 @@ class GPPSRLAgent(Agent):
                 rewards_sample: Callable[[tf.Tensor], tf.Tensor],
                 horizon: int,
                 s0: tf.Tensor,
-                gamma: float) -> List[tf.Tensor]:
+                gamma: float) -> Tuple[tf.Tensor]:
         """
         Performs Monte Carlo rollouts, using a posterior sample of the dynamics
         and a posterior sample of the rewards models, for a length of *horizon*,
