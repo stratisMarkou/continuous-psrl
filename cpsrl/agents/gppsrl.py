@@ -67,10 +67,12 @@ class GPPSRLAgent(Agent):
         # Convert episode to tensors, to update the models' training data
         s, sa, s_, sas_, r = convert_episode_to_tensors(episode,
                                                         dtype=self.dtype)
+        s0 = s[0:1]
+        ds_ = s_ - s  # predict s' - s
 
         # Update the models' training data
-        self.initial_distribution.add_training_data(s[0:1])
-        self.dynamics_model.add_training_data(sa, s_)
+        self.initial_distribution.add_training_data(s0)
+        self.dynamics_model.add_training_data(sa, ds_)
         self.rewards_model.add_training_data(s, r)
 
     def update(self):
@@ -109,7 +111,7 @@ class GPPSRLAgent(Agent):
                     num_steps: int,
                     learn_rate: float):
 
-        if model.trainable_variables == []:
+        if not model.trainable_variables:
             raise AgentError("Attempted to train model with no trainable "
                              "parameters.")
 
@@ -226,7 +228,7 @@ class GPPSRLAgent(Agent):
             sa = tf.concat([s, a], axis=1)
 
             # Get next state and rewards from the model samples
-            s_ = dynamics_sample(sa, add_noise=True)
+            s_ = s + dynamics_sample(sa, add_noise=True)
             r = rewards_sample(s_, add_noise=True)
 
             # Check shapes of next state and rewards
