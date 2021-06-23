@@ -84,32 +84,33 @@ class GPPSRLAgent(Agent):
         """
 
         # Update pseudopoints of the GP models
-        num_ind_dyn = self.update_params["num_ind_dyn"]
-        num_ind_rew = self.update_params["num_ind_rew"]
-        self.dynamics_model.reset_inducing(num_ind=num_ind_dyn)
-        self.rewards_model.reset_inducing(num_ind=num_ind_rew)
+        params = self.update_params
+        self.dynamics_model.reset_inducing(num_ind=params["num_ind_dyn"])
+        self.rewards_model.reset_inducing(num_ind=params["num_ind_rew"])
 
         # Train the initial distribution, dynamics and reward models
+        print("Updating models...")
         self.initial_distribution.train()
+        dyn_loss = self.train_model(self.dynamics_model,
+                                    num_steps=params["num_steps_dyn"],
+                                    learn_rate=params["learn_rate_dyn"])
+        rew_loss = self.train_model(self.rewards_model,
+                                    num_steps=params["num_steps_rew"],
+                                    learn_rate=params["learn_rate_rew"])
 
-        self.train_model(self.dynamics_model,
-                         num_steps=self.update_params["num_steps_dyn"],
-                         learn_rate=self.update_params["learn_rate_dyn"])
-
-        self.train_model(self.rewards_model,
-                         num_steps=self.update_params["num_steps_rew"],
-                         learn_rate=self.update_params["learn_rate_rew"])
+        print(f"Dynamics loss: {dyn_loss:.4f}, Reward loss: {rew_loss:.4f}")
 
         # Optimise the policy
-        self.optimise_policy(num_rollouts=self.update_params["num_rollouts"],
-                             num_features=self.update_params["num_features"],
-                             num_steps=self.update_params["num_steps_policy"],
-                             learn_rate=self.update_params["learn_rate_policy"])
+        print("Updating policy...")
+        self.optimise_policy(num_rollouts=params["num_rollouts"],
+                             num_features=params["num_features"],
+                             num_steps=params["num_steps_policy"],
+                             learn_rate=params["learn_rate_policy"])
 
     def train_model(self,
                     model: Union[VFEGP, VFEGPStack],
                     num_steps: int,
-                    learn_rate: float):
+                    learn_rate: float) -> float:
 
         if not model.trainable_variables:
             raise AgentError("Attempted to train model with no trainable "
@@ -129,6 +130,8 @@ class GPPSRLAgent(Agent):
             gradients = tape.gradient(loss, model.trainable_variables)
             optimizer.apply_gradients(zip(gradients, model.trainable_variables))
 
+        return loss.numpy().item()
+
     def optimise_policy(self,
                         num_rollouts: int,
                         num_features: int,
@@ -139,7 +142,7 @@ class GPPSRLAgent(Agent):
         using these samples.
 
         :param num_rollouts: number of rollouts to use
-        :param num_features: number of RFF features to use in posterior samples
+        :param num_features: number of RFFs to use in posterior samples
         :param num_steps: number of optimisation steps to run for
         :param learn_rate: policy optimisation learning rate
         :return:
@@ -151,6 +154,7 @@ class GPPSRLAgent(Agent):
 
         # Initialise optimiser
         optimizer = tf.optimizers.Adam(learn_rate)
+        print_freq = num_steps // 10
 
         for i in range(num_steps):
             with tf.GradientTape() as tape:
@@ -172,6 +176,9 @@ class GPPSRLAgent(Agent):
 
                 # Loss is (-ve) mean discounted reward, normalised by horizon
                 loss = - tf.reduce_mean(cum_reward) / self.horizon
+
+                if i % print_freq == 0 or i == num_steps - 1:
+                    print(f"Step: {i}, Loss: {loss:.4f}")
 
             # Compute gradients wrt policy variables and apply gradient step
             gradients = tape.gradient(loss, self.policy.trainable_variables)
