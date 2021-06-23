@@ -52,11 +52,136 @@ parser.add_argument("--model_dir",
                     help="Directory for storing models.")
 
 # Environment parameters (for dynamics and rewards)
-parser.add_argument("--gamma", type=int, default=0.99, help="Discount factor.")
+parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor.")
+parser.add_argument("--horizon", type=int, default=None, help="Env horizon.")
 
-# # Agent parameters
-# parser.add_argument("--agent_params")
+# Dynamics model parameters
+parser.add_argument("--dyn_trainable_mean",
+                    dest="dyn_trainable_mean",
+                    action="store_true",
+                    help="Optimize mean of the dynamics model")
+parser.add_argument("--dyn_trainable_cov",
+                    dest="dyn_trainable_cov",
+                    action="store_true",
+                    help="Optimize covariance of the dynamics model")
+parser.add_argument("--dyn_trainable_inducing",
+                    dest="dyn_trainable_inducing",
+                    action="store_true",
+                    help="Optimize inducing points of the dynamics model")
+parser.add_argument("--dyn_trainable_noise",
+                    dest="dyn_trainable_noise",
+                    action="store_true",
+                    help="Optimize noise of the dynamics model")
+parser.add_argument("--dyn_log_coeff",
+                    type=float,
+                    default=-1.0,
+                    help="Log coefficients for dynamics model.")
+parser.add_argument("--dyn_log_scale",
+                    type=float,
+                    default=-1.0,
+                    help="Log scale for dynamics model.")
+parser.add_argument("--dyn_log_noise",
+                    type=float,
+                    default=-2.0,
+                    help="Log noise for dynamics model.")
 
+# Reward model parameters
+parser.add_argument("--rew_trainable_mean",
+                    dest="rew_trainable_mean",
+                    action="store_true",
+                    help="Optimize mean of the rewards model")
+parser.add_argument("--rew_trainable_cov",
+                    dest="rew_trainable_cov",
+                    action="store_true",
+                    help="Optimize covariance of the rewards model")
+parser.add_argument("--rew_trainable_inducing",
+                    dest="rew_trainable_inducing",
+                    action="store_true",
+                    help="Optimize inducing points of the rewards model")
+parser.add_argument("--rew_trainable_noise",
+                    dest="rew_trainable_noise",
+                    action="store_true",
+                    help="Optimize noise of the rewards model")
+parser.add_argument("--rew_log_coeff",
+                    type=float,
+                    default=-1.0,
+                    help="Log coefficients for rewards model.")
+parser.add_argument("--rew_log_scale",
+                    type=float,
+                    default=-1.0,
+                    help="Log scale for rewards model.")
+parser.add_argument("--rew_log_noise",
+                    type=float,
+                    default=-2.0,
+                    help="Log noise for rewards model.")
+
+# Initial distribution parameters
+parser.add_argument("--init_trainable",
+                    dest="init_trainable",
+                    action="store_true",
+                    help="Optimize initial distribution.")
+parser.add_argument("--init_mean",
+                    type=float,
+                    default=0.0,
+                    help="Mean for initial distribution.")
+parser.add_argument("--init_scale",
+                    type=float,
+                    default=1.0,
+                    help="Scale for initial distribution.")
+
+# Policy parameters
+parser.add_argument("--hidden_size",
+                    type=int,
+                    default=64,
+                    help="Hidden size for policy network.")
+parser.add_argument("--trainable_policy",
+                    dest="trainable_policy",
+                    action="store_true",
+                    help="Optimize policy.")
+
+# Update/optimization parameters
+parser.add_argument("--num_steps_dyn",
+                    type=int,
+                    default=10,
+                    help="Number of optimization steps for dynamics model.")
+parser.add_argument("--learn_rate_dyn",
+                    type=float,
+                    default=1e-3,
+                    help="Learning rate for optimizing dynamics model.")
+parser.add_argument("--num_ind_dyn",
+                    type=int,
+                    default=None,
+                    help="Number of inducing points for dynamics model. "
+                         "Determined automatically if set to None.")
+parser.add_argument("--num_steps_rew",
+                    type=int,
+                    default=10,
+                    help="Number of optimization steps for rewards model.")
+parser.add_argument("--learn_rate_rew",
+                    type=float,
+                    default=1e-3,
+                    help="Learning rate for optimizing rewards model.")
+parser.add_argument("--num_ind_rew",
+                    type=int,
+                    default=None,
+                    help="Number of inducing points for rewards model. "
+                         "Determined automatically if set to None.")
+parser.add_argument("--num_rollouts",
+                    type=int,
+                    default=20,
+                    help="Number of rollouts to simulate.")
+parser.add_argument("--num_features",
+                    type=int,
+                    default=200,
+                    help="Number of Fourier features for posterior samples.")
+parser.add_argument("--num_steps_policy",
+                    type=int,
+                    default=100,
+                    help="Number of optimization steps for policy.")
+parser.add_argument("--learn_rate_policy",
+                    type=float,
+                    default=1e-3,
+                    help="Learning rate for optimizing policy.")
 
 # =============================================================================
 # Setup
@@ -77,7 +202,7 @@ print(vars(args))
 # Set up env
 env_rng = next(rng_seq)
 if args.env == "MountainCar":
-    env = MountainCar(rng=env_rng)
+    env = MountainCar(rng=env_rng, horizon=args.horizon)
 elif args.env == "CartPole":
     env = CartPole(rng=env_rng)
 else:
@@ -85,34 +210,25 @@ else:
 
 # Set up models
 S, A = len(env.state_space), len(env.action_space)
-dyn_trainable_mean = True
-dyn_trainable_cov = True
-dyn_trainable_inducing = True
-dyn_trainable_noise = True
-
-dyn_log_coeff = 0.
-dyn_log_scales = (S + A) * [0.]
-dyn_log_noise = -1.
 
 # 1. Dynamics models
-
 dyn_means = [LinearMean(input_dim=S + A,
-                        trainable=dyn_trainable_mean,
+                        trainable=args.dyn_trainable_mean,
                         dtype=dtype)
              for i in range(S)]
 
-dyn_covs = [EQ(log_coeff=dyn_log_coeff,
-               log_scales=dyn_log_scales,
-               trainable=dyn_trainable_cov,
+dyn_covs = [EQ(log_coeff=args.dyn_log_coeff,
+               log_scales=(S + A) * [args.dyn_log_scale],
+               trainable=args.dyn_trainable_cov,
                dtype=dtype)
             for _ in range(S)]
 
 dyn_vfe_gps = [VFEGP(mean=dyn_means[i],
                      cov=dyn_covs[i],
                      input_dim=S + A,
-                     trainable_inducing=dyn_trainable_inducing,
-                     log_noise=dyn_log_noise,
-                     trainable_noise=dyn_trainable_noise,
+                     trainable_inducing=args.dyn_trainable_inducing,
+                     log_noise=args.dyn_log_noise,
+                     trainable_noise=args.dyn_trainable_noise,
                      dtype=dtype,
                      x_ind=tf.zeros((1, S + A), dtype=dtype),
                      num_ind=None)
@@ -121,65 +237,56 @@ dyn_vfe_gps = [VFEGP(mean=dyn_means[i],
 dynamics_model = VFEGPStack(vfe_gps=dyn_vfe_gps, dtype=dtype)
 
 # 2. Reward model
-rew_trainable_mean = True
-rew_trainable_cov = False
-rew_trainable_inducing = False
-rew_trainable_noise = True
-
-rew_log_coeff = 0.
-rew_log_scales = S * [0.]
-rew_log_noise = -1.
-
 rew_mean = LinearMean(input_dim=S,
-                      trainable=rew_trainable_mean,
+                      trainable=args.rew_trainable_mean,
                       dtype=dtype)
 
-rew_cov = EQ(log_coeff=rew_log_coeff,
-             log_scales=rew_log_scales,
-             trainable=rew_trainable_cov,
+rew_cov = EQ(log_coeff=args.rew_log_coeff,
+             log_scales=S * [args.rew_log_scale],
+             trainable=args.rew_trainable_cov,
              dtype=dtype)
 
 rewards_model = VFEGP(mean=rew_mean,
                       cov=rew_cov,
                       input_dim=S,
-                      trainable_inducing=rew_trainable_inducing,
-                      log_noise=rew_log_noise,
-                      trainable_noise=rew_trainable_noise,
+                      trainable_inducing=args.rew_trainable_inducing,
+                      log_noise=args.rew_log_noise,
+                      trainable_noise=args.rew_trainable_noise,
                       dtype=dtype,
                       x_ind=tf.zeros((1, S), dtype=dtype),
                       num_ind=None)
 
-hidden_sizes = [64, 64]
-trainable_policy = True
-
-policy = FCNPolicy(hidden_sizes=hidden_sizes,
+policy = FCNPolicy(hidden_sizes=[args.hidden_size] * 2,
                    state_space=env.state_space,
                    action_space=env.action_space,
-                   trainable=trainable_policy,
+                   trainable=args.trainable_policy,
                    dtype=dtype)
 
-# Initial distribution parameters
-init_mean = tf.zeros(shape=(S,), dtype=dtype)
-init_scales = tf.ones(shape=(S,), dtype=dtype)
-init_trainable = False
+# 3. Initial distribution
+init_means = args.init_mean * tf.ones(shape=(S,), dtype=dtype)
+init_scales = args.init_scale * tf.ones(shape=(S,), dtype=dtype)
 
 initial_distribution = IndependentGaussian(state_space=env.state_space,
-                                           mean=init_mean,
+                                           mean=init_means,
                                            scales=init_scales,
-                                           trainable=init_trainable,
+                                           trainable=args.init_trainable,
                                            dtype=dtype)
 
+# TODO: choose number of inducing points dynamically
+num_ind_dyn = args.num_ind_dyn or 2
+num_ind_rew = args.num_ind_rew or 2
+
 update_params = {
-    "num_steps_dyn": 10,
-    "learn_rate_dyn": 1e-3,
-    "num_steps_rew": 10,
-    "learn_rate_rew": 1e-3,
-    "num_rollouts": 20,
-    "num_features": 200,
-    "num_steps_policy": 100,
-    "learn_rate_policy": 1e-3,
-    "num_ind_dyn": 2,
-    "num_ind_rew": 2
+    "num_steps_dyn": args.num_steps_dyn,
+    "learn_rate_dyn": args.learn_rate_dyn,
+    "num_ind_dyn": num_ind_dyn,
+    "num_steps_rew": args.num_steps_rew,
+    "learn_rate_rew": args.learn_rate_rew,
+    "num_ind_rew": num_ind_rew,
+    "num_rollouts": args.num_rollouts,
+    "num_features": args.num_features,
+    "num_steps_policy": args.num_steps_policy,
+    "learn_rate_policy": args.learn_rate_policy,
 }
 
 # Set up agent
