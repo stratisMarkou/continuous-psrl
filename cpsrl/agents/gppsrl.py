@@ -67,12 +67,14 @@ class GPPSRLAgent(Agent):
         # Convert episode to tensors, to update the models' training data
         s, sa, s_, sas_, r = convert_episode_to_tensors(episode,
                                                         dtype=self.dtype)
+        
+        # Initial states for initial dist. and state differences for dynamics
         s0 = s[0:1]
-        ds_ = s_ - s  # predict s' - s
+        ds = s_ - s
 
         # Update the models' training data
         self.initial_distribution.add_training_data(s0)
-        self.dynamics_model.add_training_data(sa, ds_)
+        self.dynamics_model.add_training_data(sa, ds)
         self.rewards_model.add_training_data(s, r)
 
     def update(self):
@@ -126,12 +128,13 @@ class GPPSRLAgent(Agent):
 
         for i in range(num_steps):
             with tf.GradientTape() as tape:
+                
                 # Ensure policy variables are being watched
                 tape.watch(model.trainable_variables)
 
                 loss = - model.free_energy()
 
-            if i % print_freq == 0 or i == num_steps -1:
+            if i % print_freq == 0 or i == num_steps - 1:
                 print(f"Step: {i}, Loss: {loss.numpy().item():.4f}")
 
             # Compute gradients wrt policy variables and apply gradient step
@@ -166,6 +169,7 @@ class GPPSRLAgent(Agent):
 
         for i in range(num_steps):
             with tf.GradientTape() as tape:
+                
                 # Ensure policy variables are being watched
                 tape.watch(self.policy.trainable_variables)
 
