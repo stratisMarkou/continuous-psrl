@@ -255,7 +255,13 @@ class GPPSRLAgent(Agent):
             sa = tf.concat([s, a], axis=1)
 
             # Get next state and rewards from the model samples
-            s_ = s + dynamics_sample(sa, add_noise=True)
+            ds = dynamics_sample(sa, add_noise=True)
+            
+            # Check shapes of s and ds match
+            check_shape([s, ds], [(R, S), (R, S)])
+            
+            # Compute next state and reward
+            s_ = s + ds
             r = rewards_sample(s_, add_noise=True)
 
             # Check shapes of next state and rewards
