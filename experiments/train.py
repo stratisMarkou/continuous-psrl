@@ -60,26 +60,32 @@ parser.add_argument("--dyn_trainable_mean",
                     dest="dyn_trainable_mean",
                     action="store_true",
                     help="Optimize mean of the dynamics model")
+
 parser.add_argument("--dyn_trainable_cov",
                     dest="dyn_trainable_cov",
                     action="store_true",
                     help="Optimize covariance of the dynamics model")
+
 parser.add_argument("--dyn_trainable_inducing",
                     dest="dyn_trainable_inducing",
                     action="store_true",
                     help="Optimize inducing points of the dynamics model")
+
 parser.add_argument("--dyn_trainable_noise",
                     dest="dyn_trainable_noise",
                     action="store_true",
                     help="Optimize noise of the dynamics model")
+
 parser.add_argument("--dyn_log_coeff",
                     type=float,
                     default=-1.0,
                     help="Log coefficients for dynamics model.")
+
 parser.add_argument("--dyn_log_scale",
                     type=float,
                     default=-1.0,
                     help="Log scale for dynamics model.")
+
 parser.add_argument("--dyn_log_noise",
                     type=float,
                     default=-2.0,
@@ -90,26 +96,32 @@ parser.add_argument("--rew_trainable_mean",
                     dest="rew_trainable_mean",
                     action="store_true",
                     help="Optimize mean of the rewards model")
+
 parser.add_argument("--rew_trainable_cov",
                     dest="rew_trainable_cov",
                     action="store_true",
                     help="Optimize covariance of the rewards model")
+
 parser.add_argument("--rew_trainable_inducing",
                     dest="rew_trainable_inducing",
                     action="store_true",
                     help="Optimize inducing points of the rewards model")
+
 parser.add_argument("--rew_trainable_noise",
                     dest="rew_trainable_noise",
                     action="store_true",
                     help="Optimize noise of the rewards model")
+
 parser.add_argument("--rew_log_coeff",
                     type=float,
                     default=-1.0,
                     help="Log coefficients for rewards model.")
+
 parser.add_argument("--rew_log_scale",
                     type=float,
                     default=-1.0,
                     help="Log scale for rewards model.")
+
 parser.add_argument("--rew_log_noise",
                     type=float,
                     default=-2.0,
@@ -120,10 +132,12 @@ parser.add_argument("--init_trainable",
                     dest="init_trainable",
                     action="store_true",
                     help="Optimize initial distribution.")
+
 parser.add_argument("--init_mean",
                     type=float,
                     default=0.0,
                     help="Mean for initial distribution.")
+
 parser.add_argument("--init_scale",
                     type=float,
                     default=1.0,
@@ -134,6 +148,7 @@ parser.add_argument("--hidden_size",
                     type=int,
                     default=64,
                     help="Hidden size for policy network.")
+
 parser.add_argument("--trainable_policy",
                     dest="trainable_policy",
                     action="store_true",
@@ -144,40 +159,49 @@ parser.add_argument("--num_steps_dyn",
                     type=int,
                     default=1000,
                     help="Number of optimization steps for dynamics model.")
+
 parser.add_argument("--learn_rate_dyn",
                     type=float,
                     default=1e-2,
                     help="Learning rate for optimizing dynamics model.")
+
 parser.add_argument("--num_ind_dyn",
                     type=int,
                     default=None,
                     help="Number of inducing points for dynamics model. "
                          "Determined automatically if set to None.")
+
 parser.add_argument("--num_steps_rew",
                     type=int,
                     default=1000,
                     help="Number of optimization steps for rewards model.")
+
 parser.add_argument("--learn_rate_rew",
                     type=float,
                     default=1e-2,
                     help="Learning rate for optimizing rewards model.")
+
 parser.add_argument("--num_ind_rew",
                     type=int,
                     default=None,
                     help="Number of inducing points for rewards model. "
                          "Determined automatically if set to None.")
+
 parser.add_argument("--num_rollouts",
                     type=int,
                     default=300,
                     help="Number of rollouts to simulate.")
+
 parser.add_argument("--num_features",
                     type=int,
                     default=200,
                     help="Number of Fourier features for posterior samples.")
+
 parser.add_argument("--num_steps_policy",
                     type=int,
                     default=100,
                     help="Number of optimization steps for policy.")
+
 parser.add_argument("--learn_rate_policy",
                     type=float,
                     default=3e-4,
