@@ -89,18 +89,22 @@ class GPPSRLAgent(Agent):
         self.rewards_model.reset_inducing(num_ind=params["num_ind_rew"])
 
         # Train the initial distribution, dynamics and reward models
-        print("Updating models...")
         self.initial_distribution.train()
-        dyn_loss = self.train_model(self.dynamics_model,
-                                    num_steps=params["num_steps_dyn"],
-                                    learn_rate=params["learn_rate_dyn"])
-        rew_loss = self.train_model(self.rewards_model,
-                                    num_steps=params["num_steps_rew"],
-                                    learn_rate=params["learn_rate_rew"])
 
-        print(f"Dynamics loss: {dyn_loss:.4f}, Reward loss: {rew_loss:.4f}")
+        print("Updating dynamics model...")
+        self.train_model(self.dynamics_model,
+                         num_steps=params["num_steps_dyn"],
+                         learn_rate=params["learn_rate_dyn"])
+
+        print()
+        print("Updating rewards model...")
+        self.train_model(self.rewards_model,
+                         num_steps=params["num_steps_rew"],
+                         learn_rate=params["learn_rate_rew"])
+
 
         # Optimise the policy
+        print()
         print("Updating policy...")
         self.optimise_policy(num_rollouts=params["num_rollouts"],
                              num_features=params["num_features"],
@@ -118,6 +122,7 @@ class GPPSRLAgent(Agent):
 
         # Initialise optimiser
         optimizer = tf.optimizers.Adam(learn_rate)
+        print_freq = num_steps // 10
 
         for i in range(num_steps):
             with tf.GradientTape() as tape:
@@ -125,6 +130,9 @@ class GPPSRLAgent(Agent):
                 tape.watch(model.trainable_variables)
 
                 loss = - model.free_energy()
+
+            if i % print_freq == 0 or i == num_steps -1:
+                print(f"Step: {i}, Loss: {loss.numpy().item():.4f}")
 
             # Compute gradients wrt policy variables and apply gradient step
             gradients = tape.gradient(loss, model.trainable_variables)
@@ -178,7 +186,15 @@ class GPPSRLAgent(Agent):
                 loss = - tf.reduce_mean(cum_reward) / self.horizon
 
                 if i % print_freq == 0 or i == num_steps - 1:
-                    print(f"Step: {i}, Loss: {loss:.4f}")
+                    rew_mean = tf.reduce_mean(cum_reward)
+                    rew_std = tf.math.reduce_std(cum_reward)
+                    rew_min = tf.math.reduce_min(cum_reward)
+                    rew_max = tf.math.reduce_max(cum_reward)
+                    print(f"Step: {i}, Loss: {loss:.4f}, "
+                         + f"Mean reward: {rew_mean:.4f}, "
+                         + f"Std reward: {rew_std:.4f}, "
+                         + f"Min reward: {rew_min:.4f}. "
+                         + f"Max reward: {rew_max:.4f}")
 
             # Compute gradients wrt policy variables and apply gradient step
             gradients = tape.gradient(loss, self.policy.trainable_variables)

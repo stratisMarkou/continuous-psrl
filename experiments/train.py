@@ -142,11 +142,11 @@ parser.add_argument("--trainable_policy",
 # Update/optimization parameters
 parser.add_argument("--num_steps_dyn",
                     type=int,
-                    default=10,
+                    default=1000,
                     help="Number of optimization steps for dynamics model.")
 parser.add_argument("--learn_rate_dyn",
                     type=float,
-                    default=1e-3,
+                    default=1e-2,
                     help="Learning rate for optimizing dynamics model.")
 parser.add_argument("--num_ind_dyn",
                     type=int,
@@ -155,11 +155,11 @@ parser.add_argument("--num_ind_dyn",
                          "Determined automatically if set to None.")
 parser.add_argument("--num_steps_rew",
                     type=int,
-                    default=10,
+                    default=1000,
                     help="Number of optimization steps for rewards model.")
 parser.add_argument("--learn_rate_rew",
                     type=float,
-                    default=1e-3,
+                    default=1e-2,
                     help="Learning rate for optimizing rewards model.")
 parser.add_argument("--num_ind_rew",
                     type=int,
@@ -168,7 +168,7 @@ parser.add_argument("--num_ind_rew",
                          "Determined automatically if set to None.")
 parser.add_argument("--num_rollouts",
                     type=int,
-                    default=20,
+                    default=300,
                     help="Number of rollouts to simulate.")
 parser.add_argument("--num_features",
                     type=int,
@@ -180,7 +180,7 @@ parser.add_argument("--num_steps_policy",
                     help="Number of optimization steps for policy.")
 parser.add_argument("--learn_rate_policy",
                     type=float,
-                    default=1e-3,
+                    default=3e-4,
                     help="Learning rate for optimizing policy.")
 
 # =============================================================================
@@ -273,8 +273,8 @@ initial_distribution = IndependentGaussian(state_space=env.state_space,
                                            dtype=dtype)
 
 # TODO: choose number of inducing points dynamically
-num_ind_dyn = args.num_ind_dyn or 2
-num_ind_rew = args.num_ind_rew or 2
+num_ind_dyn = args.num_ind_dyn or 100
+num_ind_rew = args.num_ind_rew or 100
 
 update_params = {
     "num_steps_dyn": args.num_steps_dyn,
@@ -321,7 +321,10 @@ for i in range(args.num_episodes):
     # Train agent models and/or policy
     agent.update()
 
+    cumulative_reward = cumulative_reward.item()
+    print()
     print(f'Episode {i} | Return: {cumulative_reward:.3f}')
+    print()
 
     # Save episode
     with open(os.path.join(args.data_dir, exp_name + f"_ep-{i}.pkl"), mode="wb") as f:
