@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from typing import List, Callable
 
-from cpsrl.helpers import check_shape
+from cpsrl.helpers import check_shape, VariableOrTensor
 
 import numpy as np
 import tensorflow as tf
@@ -19,8 +19,8 @@ class Covariance(tf.keras.Model):
 
     @abstractmethod
     def __call__(self,
-                 x1: tf.Tensor,
-                 x2: tf.Tensor,
+                 x1: VariableOrTensor,
+                 x2: VariableOrTensor,
                  diag: bool = False,
                  epsilon: float = None) -> tf.Tensor:
         pass

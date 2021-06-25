@@ -1,4 +1,4 @@
-from typing import Tuple, List, Callable, Optional
+from typing import Tuple, List, Callable, Optional, Union
 
 import tensorflow as tf
 import numpy as np
@@ -17,7 +17,7 @@ from cpsrl.errors import ModelError
 class VFEGPStack(tf.keras.Model):
     
     def __init__(self,
-                 vfe_gps: List,
+                 vfe_gps: List['VFEGP'],
                  dtype: tf.DType,
                  name: str = 'gp_stack',
                  **kwargs):
@@ -53,9 +53,7 @@ class VFEGPStack(tf.keras.Model):
         for i, vfe_gp in enumerate(self.vfe_gps):
             vfe_gp.add_training_data(x_train, y_train[:, i:i+1])
 
-    def reset_inducing(self,
-                       x_ind: tf.Tensor = None,
-                       num_ind: int = None) -> tf.Tensor:
+    def reset_inducing(self, x_ind: tf.Tensor = None, num_ind: int = None):
         """
         Updates the inducing points of all the GP models in the stack.
 
@@ -252,7 +250,7 @@ class VFEGP(tf.keras.Model):
         """
         return tf.math.exp(self.log_noise)
 
-    def post_pred(self, x_pred: tf.Tensor) -> List[tf.Tensor]:
+    def post_pred(self, x_pred: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
         """
         Computes the predictive posterior of the VFE GP model in a
         numerically stable way, returning the mean vector and covariance
@@ -297,8 +295,8 @@ class VFEGP(tf.keras.Model):
         beta = tf.linalg.triangular_solve(tf.transpose(L, (1, 0)),
                                           beta,
                                           lower=False)
-        mean = tf.matmul(K_pred_ind / self.noise ** 2, beta)[:, 0]
-        
+        mean = (K_pred_ind / self.noise ** 2 @ beta)[:, 0]
+
         # Compute posterior covariance
         C = tf.linalg.triangular_solve(L, K_ind_pred)
         D = tf.linalg.triangular_solve(B_chol, C)
@@ -404,8 +402,7 @@ class VFEGP(tf.keras.Model):
 
         # Compute mean of VFE posterior over inducing values
         diff = self.y_train - prior_train
-        u_mean = self.noise ** -2 * \
-                 L @ tf.linalg.cholesky_solve(B_chol, U @ diff)
+        u_mean = L @ tf.linalg.cholesky_solve(B_chol, U @ diff) / self.noise ** 2
         u_mean = u_mean + prior_ind
 
         # Compute Cholesky of covariance of VFE posterior over inducing values
@@ -437,9 +434,8 @@ class VFEGP(tf.keras.Model):
         
         return post_sample
 
-    def compute_helper_matrices(self,
-                                K_ind_ind: tf.Tensor,
-                                K_ind_train: tf.Tensor) -> Tuple[tf.Tensor]:
+    def compute_helper_matrices(self, K_ind_ind: tf.Tensor, K_ind_train: tf.Tensor) \
+            -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
         """
         Computes matrices used by other methods of this class,
         for numerically stable calculations.

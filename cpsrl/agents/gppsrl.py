@@ -1,12 +1,11 @@
-from typing import List, Tuple, Callable
+from typing import Callable
 
-from cpsrl.policies.policies import Policy
+from cpsrl.policies.policies import FCNPolicy
 from cpsrl.agents.agent import Agent
 from cpsrl.models.gp import VFEGP, VFEGPStack
 from cpsrl.models.initial_distributions import InitialStateDistribution
 from cpsrl.errors import AgentError
 from cpsrl.helpers import *
-from cpsrl.train_utils import Transition
 
 import tensorflow as tf
 
@@ -24,7 +23,7 @@ class GPPSRLAgent(Agent):
                  initial_distribution: InitialStateDistribution,
                  dynamics_model: VFEGPStack,
                  rewards_model: VFEGP,
-                 policy: Policy,
+                 policy: FCNPolicy,
                  update_params: dict,
                  dtype: tf.DType):
         """
@@ -58,19 +57,27 @@ class GPPSRLAgent(Agent):
     def act(self, state: ArrayOrTensor) -> tf.Tensor:
 
         state = tf.convert_to_tensor(state, dtype=self.dtype)
+        if state.ndim == 1:
+            state = tf.expand_dims(state, axis=0)
 
-        return self.policy(state)
+        action = self.policy(state)
+        action = tf.squeeze(action, axis=0)
+        return action
 
     def observe(self, episode: List[Transition]):
 
         # Convert episode to tensors, to update the models' training data
         s, sa, s_, sas_, r = convert_episode_to_tensors(episode,
                                                         dtype=self.dtype)
+        
+        # Initial states for initial dist. and state differences for dynamics
+        s0 = s[0:1]
+        ds = s_ - s
 
         # Update the models' training data
-        self.initial_distribution.add_training_data(s)
-        self.dynamics_model.add_training_data(sa, s_)
-        self.rewards_model.add_training_data(sas_, r)
+        self.initial_distribution.add_training_data(s0)
+        self.dynamics_model.add_training_data(sa, ds)
+        self.rewards_model.add_training_data(s, r)
 
     def update(self):
         """
@@ -81,51 +88,61 @@ class GPPSRLAgent(Agent):
         """
 
         # Update pseudopoints of the GP models
-        self.dynamics_model.reset_inducing(num_ind=self.update_params[
-                                               "num_ind_dyn"])
-        self.rewards_model.reset_inducing(num_ind=self.update_params[
-                                              "num_ind_rew"])
+        params = self.update_params
+        self.dynamics_model.reset_inducing(num_ind=params["num_ind_dyn"])
+        self.rewards_model.reset_inducing(num_ind=params["num_ind_rew"])
 
         # Train the initial distribution, dynamics and reward models
         self.initial_distribution.train()
 
+        print("Updating dynamics model...")
         self.train_model(self.dynamics_model,
-                         num_steps=self.update_params["num_steps_dyn"],
-                         learn_rate=self.update_params["learn_rate_dyn"])
+                         num_steps=params["num_steps_dyn"],
+                         learn_rate=params["learn_rate_dyn"])
 
+        print()
+        print("Updating rewards model...")
         self.train_model(self.rewards_model,
-                         num_steps=self.update_params["num_steps_rew"],
-                         learn_rate=self.update_params["learn_rate_rew"])
+                         num_steps=params["num_steps_rew"],
+                         learn_rate=params["learn_rate_rew"])
 
         # Optimise the policy
-        self.optimise_policy(num_rollouts=self.update_params["num_rollouts"],
-                             num_features=self.update_params["num_features"],
-                             num_steps=self.update_params["num_steps_policy"],
-                             learn_rate=self.update_params["learn_rate_policy"])
+        print()
+        print("Updating policy...")
+        self.optimise_policy(num_rollouts=params["num_rollouts"],
+                             num_features=params["num_features"],
+                             num_steps=params["num_steps_policy"],
+                             learn_rate=params["learn_rate_policy"])
 
     def train_model(self,
                     model: Union[VFEGP, VFEGPStack],
                     num_steps: int,
-                    learn_rate: float):
+                    learn_rate: float) -> float:
 
-        if model.trainable_variables == []:
+        if not model.trainable_variables:
             raise AgentError("Attempted to train model with no trainable "
                              "parameters.")
 
         # Initialise optimiser
         optimizer = tf.optimizers.Adam(learn_rate)
+        print_freq = np.maximum(1, num_steps // 10)
 
         for i in range(num_steps):
             with tf.GradientTape() as tape:
-
+                
                 # Ensure policy variables are being watched
                 tape.watch(model.trainable_variables)
 
                 loss = - model.free_energy()
 
+            if i % print_freq == 0 or i == num_steps - 1:
+                print(f"Step: {i}, Loss: {loss.numpy().item():.4f}")
+
             # Compute gradients wrt policy variables and apply gradient step
             gradients = tape.gradient(loss, model.trainable_variables)
             optimizer.apply_gradients(zip(gradients, model.trainable_variables))
+
+        return loss.numpy().item()
 
     def optimise_policy(self,
                         num_rollouts: int,
@@ -137,7 +154,7 @@ class GPPSRLAgent(Agent):
         using these samples.
 
         :param num_rollouts: number of rollouts to use
-        :param num_features: number of RFF features to use in posterior samples
+        :param num_features: number of RFFs to use in posterior samples
         :param num_steps: number of optimisation steps to run for
         :param learn_rate: policy optimisation learning rate
         :return:
@@ -149,10 +166,11 @@ class GPPSRLAgent(Agent):
 
         # Initialise optimiser
         optimizer = tf.optimizers.Adam(learn_rate)
+        print_freq = np.maximum(1, num_steps // 10)
 
         for i in range(num_steps):
             with tf.GradientTape() as tape:
-
+                
                 # Ensure policy variables are being watched
                 tape.watch(self.policy.trainable_variables)
 
@@ -172,17 +190,29 @@ class GPPSRLAgent(Agent):
                 # Loss is (-ve) mean discounted reward, normalised by horizon
                 loss = - tf.reduce_mean(cum_reward) / self.horizon
 
+                if i % print_freq == 0 or i == num_steps - 1:
+                    rew_mean = tf.reduce_mean(cum_reward)
+                    rew_std = tf.math.reduce_std(cum_reward)
+                    rew_min = tf.math.reduce_min(cum_reward)
+                    rew_max = tf.math.reduce_max(cum_reward)
+                    print(f"Step: {i}, Loss: {loss:.4f}, "
+                         + f"Mean reward: {rew_mean:.4f}, "
+                         + f"Std reward: {rew_std:.4f}, "
+                         + f"Min reward: {rew_min:.4f}. "
+                         + f"Max reward: {rew_max:.4f}")
+
             # Compute gradients wrt policy variables and apply gradient step
             gradients = tape.gradient(loss, self.policy.trainable_variables)
             optimizer.apply_gradients(zip(gradients,
                                           self.policy.trainable_variables))
 
     def rollout(self,
-                dynamics_sample: Callable[[tf.Tensor], tf.Tensor],
-                rewards_sample: Callable[[tf.Tensor], tf.Tensor],
+                dynamics_sample: Callable,
+                rewards_sample: Callable,
                 horizon: int,
                 s0: tf.Tensor,
-                gamma: float) -> Tuple[tf.Tensor]:
+                gamma: float) \
+            -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
         """
         Performs Monte Carlo rollouts, using a posterior sample of the dynamics
         and a posterior sample of the rewards models, for a length of *horizon*,
@@ -210,13 +240,12 @@ class GPPSRLAgent(Agent):
         # Arrays for storing rollouts
         states = []
         actions = []
-        next_states = []
         rewards = []
+        next_states = []
 
         cumulative_reward = tf.zeros(shape=(R,), dtype=self.dtype)
 
         for i in range(horizon):
-
             # Get action from the policy
             a = self.policy(s)
 
@@ -227,7 +256,13 @@ class GPPSRLAgent(Agent):
             sa = tf.concat([s, a], axis=1)
 
             # Get next state and rewards from the model samples
-            s_ = dynamics_sample(sa, add_noise=True)
+            ds = dynamics_sample(sa, add_noise=True)
+            
+            # Check shapes of s and ds match
+            check_shape([s, ds], [(R, S), (R, S)])
+            
+            # Compute next state and reward
+            s_ = s + ds
             r = rewards_sample(s_, add_noise=True)
 
             # Check shapes of next state and rewards
@@ -239,8 +274,8 @@ class GPPSRLAgent(Agent):
             # Store states, actions and rewards
             states.append(s)
             actions.append(a)
-            next_states.append(s_)
             rewards.append(r)
+            next_states.append(s_)
 
             # Increment cumulative reward and update state
             cumulative_reward = cumulative_reward + (gamma ** i) * r
@@ -248,8 +283,7 @@ class GPPSRLAgent(Agent):
 
         states = tf.stack(states, axis=1)
         actions = tf.stack(actions, axis=1)
-        next_states = tf.stack(next_states, axis=1)
         rewards = tf.stack(rewards, axis=1)
+        next_states = tf.stack(next_states, axis=1)
 
-        return cumulative_reward, states, actions, next_states, rewards
-
+        return cumulative_reward, states, actions, rewards, next_states

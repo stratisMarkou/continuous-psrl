@@ -4,7 +4,9 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 from cpsrl.agents import Agent
-from cpsrl.train_utils import play_episode, Transition
+from cpsrl.train_utils import play_episode
+from cpsrl.helpers import check_shape, Transition
+
 
 # =============================================================================
 # Base environment class
@@ -62,6 +64,7 @@ class Environment(ABC):
             state = next_state
 
         reward = self.get_reward(self.state, action, next_state)
+        check_shape(reward, (1,))
 
         self.timestep += 1
         self.state = next_state

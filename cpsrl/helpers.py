@@ -3,6 +3,7 @@ import sys
 import random
 
 from typing import List, Tuple, Sequence, Generator, Union, Optional
+from typing_extensions import Protocol
 from collections import namedtuple
 
 import numpy as np
@@ -15,11 +16,12 @@ from cpsrl.errors import ShapeError
 # ==============================================================================
 
 ArrayOrTensor = Union[np.ndarray, tf.Tensor]
-ArrayType = Union[np.ndarray, Sequence[np.ndarray]]
+ArrayType = Union[ArrayOrTensor, Sequence[ArrayOrTensor]]
 ShapeType = Union[Tuple, Sequence[Tuple]]
 ArrayOrArrayDict = Union[ArrayType, Tuple[ArrayType, dict]]
+VariableOrTensor = Union[tf.Variable, tf.Tensor]
 
-Transition = namedtuple("Transition", ("obs", "action", "reward", "next_obs"))
+Transition = namedtuple("Transition", ("state", "action", "reward", "next_state"))
 
 
 # ==============================================================================
@@ -27,32 +29,24 @@ Transition = namedtuple("Transition", ("obs", "action", "reward", "next_obs"))
 # ==============================================================================
 
 def convert_episode_to_tensors(episode: List[Transition], dtype: tf.DType):
-
-    episode = list(zip(episode))
-
     episode_sa = []
-    episode_s_ = []
     episode_sas_ = []
-    episode_r = []
 
     # Check shapes and append data to arrays
-    for s, a, s_, r in episode:
+    ep = Transition(*zip(*episode))
+    for s, a, r, s_ in zip(ep.state, ep.action, ep.reward, ep.next_state):
 
         # Check the shape of the states, actions and rewards
-        check_shape([s, a, s_, r], [('S',), ('A',), ('S',), (1,)])
+        check_shape([s, a, r, s_,], [('S',), ('A',), (1,), ('S',)])
 
-        # Append states, actions and rewards to lists of observed data
         episode_sa.append(np.concatenate([s, a]))
-        episode_s_.append(s_)
-
         episode_sas_.append(np.concatenate([s, a, s_]))
-        episode_r.append(r)
 
-    episode_s = tf.convert_to_tensor(episode[0][0], dtype=dtype)
+    episode_s = tf.convert_to_tensor(ep.state, dtype=dtype)
     episode_sa = tf.convert_to_tensor(episode_sa, dtype=dtype)
-    episode_s_ = tf.convert_to_tensor(episode_s_, dtype=dtype)
+    episode_s_ = tf.convert_to_tensor(ep.next_state, dtype=dtype)
     episode_sas_ = tf.convert_to_tensor(episode_sas_, dtype=dtype)
-    episode_r = tf.convert_to_tensor(episode_r, dtype=dtype)
+    episode_r = tf.convert_to_tensor(ep.reward, dtype=dtype)
 
     return episode_s, episode_sa, episode_s_, episode_sas_, episode_r
 
@@ -103,7 +97,7 @@ def check_shape(arrays: ArrayType,
         shape_dict = {} if shape_dict is None else shape_dict
         
         if len(arrays) != len(shapes):
-            raise ShapeError(f"Got number of tesors/arrays {len(arrays)}, "
+            raise ShapeError(f"Got number of tensors/arrays {len(arrays)}, "
                              f"and number of shapes {len(shapes)}.")
             
         for argnum, (array, shape) in enumerate(zip(arrays, shapes)):
@@ -122,11 +116,11 @@ def check_shape(arrays: ArrayType,
         return _check_shape(arrays, shapes)[0]
 
 
-def _check_shape(array: np.ndarray,
+def _check_shape(array: ArrayOrTensor,
                  shape: Tuple,
                  shape_dict: Optional[dict] = None,
-                 argnum: bool = None
-                 ) -> Union[np.ndarray, Tuple[np.ndarray, dict]]:
+                 argnum: int = None
+                 ) -> Union[ArrayOrTensor, Tuple[ArrayOrTensor, dict]]:
     
     array_shape = array.shape
     check_string_names = shape_dict is not None
@@ -157,7 +151,7 @@ def _check_shape(array: np.ndarray,
                 shape_dict[s2] = s1
                 
             elif shape_dict[s2] != s1:
-                raise ShapeError(f"Tensor/Array at argument postition {argnum} "
+                raise ShapeError(f"Tensor/Array at argument position {argnum} "
                                  f"had shape with {s2} of size {s1}, "
                                  f"expected axis size {shape_dict[s2]}.")
             

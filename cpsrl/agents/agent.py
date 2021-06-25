@@ -2,7 +2,7 @@ import numpy as np
 from typing import List, Tuple, Optional
 
 from abc import ABC, abstractmethod
-from cpsrl.train_utils import Transition
+from cpsrl.helpers import Transition
 
 
 # =============================================================================

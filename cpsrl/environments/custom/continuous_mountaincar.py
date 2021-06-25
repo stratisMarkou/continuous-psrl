@@ -5,8 +5,7 @@ import matplotlib.pyplot as plt
 
 from cpsrl.environments import Environment
 from cpsrl.errors import EnvironmentError
-from cpsrl.train_utils import Transition
-from cpsrl.helpers import check_shape
+from cpsrl.helpers import check_shape, Transition
 
 
 # =============================================================================
@@ -22,11 +21,13 @@ class MountainCar(Environment):
 
     def __init__(self,
                  rng: np.random.Generator,
+                 horizon: Optional[int] = None,
                  sub_sampling_factor: int = 1,
                  goal_pos: float = 0.5,
                  goal_scale: float = 1.0):
 
-        super().__init__(horizon=100,
+        horizon = horizon or 100
+        super().__init__(horizon=horizon,
                          rng=rng,
                          sub_sampling_factor=sub_sampling_factor)
 
@@ -89,6 +90,7 @@ class MountainCar(Environment):
 
         diff = (state - self.reward_loc) / self.reward_scale
         reward = np.exp(-0.5 * np.sum(diff**2))
+        reward = reward.reshape((1,))
 
         return reward
 
