@@ -84,6 +84,8 @@ class EQ(Covariance):
             eq_cov = eq_cov + epsilon * tf.eye(eq_cov.shape[0], 
                                                dtype=self.dtype)
 
+        eq_cov = tf.linalg.diag_part(eq_cov) if diag else eq_cov
+
         return eq_cov
 
     @property
