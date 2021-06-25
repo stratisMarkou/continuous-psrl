@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 from cpsrl.agents import Agent
-from cpsrl.train_utils import play_episode
+from cpsrl.train_utils import play_episodes
 from cpsrl.helpers import check_shape, Transition
 
 
@@ -77,21 +77,10 @@ class Environment(ABC):
              init_states: Optional[List[np.ndarray]] = None,
              **plot_kwargs):
 
-        if ((num_trajectories is None and init_states is None)
-                or (num_trajectories is not None and init_states is not None)):
-            raise ValueError("One of {num_trajectories, init_states}"
-                             " should not be None.")
-
-        if num_trajectories is not None:
-            init_states = [self.reset() for _ in range(num_trajectories)]
-
-        trajectories = []
-        for init_state in init_states:
-            _, trajectory = play_episode(agent=agent,
-                                         environment=self,
-                                         init_state=init_state)
-            trajectories.append(trajectory)
-
+        trajectories = play_episodes(agent=agent,
+                                     environment=self,
+                                     num_episodes=num_trajectories,
+                                     init_states=init_states)
         self.plot_trajectories(trajectories, **plot_kwargs)
 
     @abstractmethod

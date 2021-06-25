@@ -13,7 +13,7 @@ from cpsrl.models.gp import VFEGP, VFEGPStack
 from cpsrl.models.initial_distributions import IndependentGaussian
 from cpsrl.policies.policies import FCNPolicy
 from cpsrl.environments import MountainCar, CartPole
-from cpsrl.train_utils import play_episode
+from cpsrl.train_utils import play_episode, eval_models
 from cpsrl.helpers import set_seed, Logger
 
 parser = argparse.ArgumentParser()
@@ -330,6 +330,8 @@ elif args.agent == "Random":
 else:
     raise ValueError(f"Invalid agent: {args.agent}")
 
+eval_agent = RandomAgent(action_space=env.action_space, rng=next(rng_seq))
+
 # =============================================================================
 # Training loop
 # =============================================================================
@@ -345,7 +347,16 @@ for i in range(args.num_episodes):
     # Train agent models and/or policy
     agent.update()
 
-    cumulative_reward = cumulative_reward.item()
+    if isinstance(agent, GPPSRLAgent):
+        eval_models(dynamics_model=agent.dynamics_model,
+                    rewards_model=agent.rewards_model,
+                    agent=eval_agent,
+                    environment=env,
+                    num_features=args.num_features,
+                    dtype=dtype,
+                    num_trajectories=10)
+
+    cumulative_reward = cumulative_reward
     print()
     print(f'Episode {i} | Return: {cumulative_reward:.3f}')
     print()
