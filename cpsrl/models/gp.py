@@ -267,14 +267,15 @@ class VFEGP(tf.keras.Model):
         check_shape([x_pred, self.x_train], [('K', 'D'), ('N', 'D')])
 
         # Prior mean and covariance
-        prior_mean = self.mean(self.x_train)
-        check_shape([prior_mean, self.x_train, self.y_train],
-                    [('N', 1), ('N', 'D'), ('N', 1)])
+        prior_train = self.mean(self.x_train)
+        prior_pred = self.mean(x_pred)
+        check_shape([prior_train, prior_pred, self.x_train, self.y_train],
+                    [('N', 1), ('N', 1), ('N', 'D'), ('N', 1)])
         K_pred_pred = self.cov(x_pred, x_pred)
 
         # If there's no training data, return the prior
         if self.x_train.shape[0] == 0:
-            return prior_mean, K_pred_pred
+            return prior_train, K_pred_pred
 
         # Number of training points
         K = x_pred.shape[0]
@@ -290,12 +291,14 @@ class VFEGP(tf.keras.Model):
                                                           K_ind_train)
 
         # Compute posterior mean
-        diff = self.y_train - prior_mean
+        diff = self.y_train - prior_train
         beta = tf.linalg.cholesky_solve(B_chol, tf.matmul(U, diff))
         beta = tf.linalg.triangular_solve(tf.transpose(L, (1, 0)),
                                           beta,
                                           lower=False)
-        mean = (K_pred_ind / self.noise ** 2 @ beta)[:, 0] + prior_mean[:, 0]
+        mean = (K_pred_ind / self.noise ** 2 @ beta)
+        print('mean.shape, prior_train.shape', mean.shape, prior_train.shape)
+        mean = mean + prior_pred
 
         # Compute posterior covariance
         C = tf.linalg.triangular_solve(L, K_ind_pred)
