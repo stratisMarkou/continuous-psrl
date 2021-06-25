@@ -1,4 +1,6 @@
-from cpsrl.policies.policies import Policy
+from typing import Callable
+
+from cpsrl.policies.policies import FCNPolicy
 from cpsrl.agents.agent import Agent
 from cpsrl.models.gp import VFEGP, VFEGPStack
 from cpsrl.models.initial_distributions import InitialStateDistribution
@@ -21,7 +23,7 @@ class GPPSRLAgent(Agent):
                  initial_distribution: InitialStateDistribution,
                  dynamics_model: VFEGPStack,
                  rewards_model: VFEGP,
-                 policy: Policy,
+                 policy: FCNPolicy,
                  update_params: dict,
                  dtype: tf.DType):
         """
@@ -104,7 +106,6 @@ class GPPSRLAgent(Agent):
                          num_steps=params["num_steps_rew"],
                          learn_rate=params["learn_rate_rew"])
 
-
         # Optimise the policy
         print()
         print("Updating policy...")
@@ -124,7 +125,7 @@ class GPPSRLAgent(Agent):
 
         # Initialise optimiser
         optimizer = tf.optimizers.Adam(learn_rate)
-        print_freq = num_steps // 10
+        print_freq = np.maximum(1, num_steps // 10)
 
         for i in range(num_steps):
             with tf.GradientTape() as tape:
@@ -165,7 +166,7 @@ class GPPSRLAgent(Agent):
 
         # Initialise optimiser
         optimizer = tf.optimizers.Adam(learn_rate)
-        print_freq = num_steps // 10
+        print_freq = np.maximum(1, num_steps // 10)
 
         for i in range(num_steps):
             with tf.GradientTape() as tape:
@@ -206,8 +207,8 @@ class GPPSRLAgent(Agent):
                                           self.policy.trainable_variables))
 
     def rollout(self,
-                dynamics_sample: SampleCallable,
-                rewards_sample: SampleCallable,
+                dynamics_sample: Callable,
+                rewards_sample: Callable,
                 horizon: int,
                 s0: tf.Tensor,
                 gamma: float) \
