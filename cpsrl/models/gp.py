@@ -275,7 +275,7 @@ class VFEGP(tf.keras.Model):
 
         # If there's no training data, return the prior
         if self.x_train.shape[0] == 0:
-            return prior_train, K_pred_pred
+            return prior_pred, K_pred_pred
 
         # Number of training points
         K = x_pred.shape[0]
@@ -321,8 +321,6 @@ class VFEGP(tf.keras.Model):
         :return:
         """
 
-        from time import time
-
         # Check model has data
         self.check_training_data()
 
@@ -360,10 +358,8 @@ class VFEGP(tf.keras.Model):
         quad = quad + 0.5 * tf.reduce_sum(c ** 2)
         
         # Compute trace term
-        trace1 = - 0.5 * tf.reduce_sum(K_train_train_diag / self.noise ** 2)
-        trace2 = 0.5 * tf.linalg.trace(tf.matmul(A, A, transpose_b=True))
-
-        trace = trace1 + trace2
+        trace = - 0.5 * tf.reduce_sum(K_train_train_diag / self.noise ** 2)
+        trace = trace + 0.5 * tf.linalg.trace(tf.matmul(A, A, transpose_b=True))
 
         free_energy = (log_det + quad + trace) / N
 
