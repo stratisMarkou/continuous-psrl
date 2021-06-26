@@ -19,12 +19,10 @@ class InitialStateDistribution(ABC):
 
     def __init__(self,
                  state_space: List[Tuple[float, float]],
-                 distribution_kind: tfd.distribution._DistributionMeta,
                  dtype: tf.DType):
 
         # Set state space and distribution, state space constraints not enforced
         self.state_space = state_space
-        self.distribution_kind = distribution_kind
         self.S = len(state_space)
 
         # Set training data and data type
@@ -38,10 +36,6 @@ class InitialStateDistribution(ABC):
     @abstractmethod
     def posterior_sample(self) -> tfd.Distribution:
         pass
-
-    @property
-    def distribution(self) -> tfd.Distribution:
-        raise NotImplementedError
 
     def add_training_data(self, init_states: tf.Tensor):
 
@@ -65,9 +59,7 @@ class IndependentGaussian(InitialStateDistribution):
                  trainable: bool,
                  dtype: tf.DType):
 
-        super().__init__(state_space=state_space,
-                         distribution_kind=tfd.MultivariateNormalDiag,
-                         dtype=dtype)
+        super().__init__(state_space=state_space, dtype=dtype)
 
         # Check shapes of the NG prior parameters
         check_shape([mu, kappa, alpha, beta],
@@ -129,6 +121,13 @@ class IndependentGaussian(InitialStateDistribution):
                     0.5 * N * self.kappa0 * diff ** 2 / (self.kappa0 + N)
 
     def posterior_sample(self) -> tfd.Distribution:
+        """
+        Samples an initial distribution from the posterior over initial
+        distributions, returning the result as a tfd.Distribution, which can
+        itself be sampled and used for initialising a rollout.
+
+        :return:
+        """
 
         # Check shape of alpha and beta posterior parameters
         check_shape([self.alpha, self.beta], [(self.S,), (self.S,)])
