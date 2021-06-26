@@ -3,7 +3,6 @@
 ## Infrastructure notes
 
 Things we would like to add to the codebase:
-* Debug posterior predictive
 * Add LBFGS optimisation
 * Adaptive number of inducing points
 * Add interfacing to environment's dynamics and rewards as models for ground truth training/testing
@@ -17,8 +16,6 @@ Things we would like to add to the codebase:
 ## Fixes to get the agent working
 
 Modifications, sanity checks and fixes to get the basic agent working:
-* Debug posterior predictive function (and possibly other functions)
-* Ensure posterior samples are sensible (plot in a notebook)
 * Increase subsampling factor to 2 or 3, reduce the horizon
 * Ensure models and policy train properly:
   - Train GP models via LBFGS
