@@ -332,7 +332,7 @@ def test_vfe_gp_noise():
 
     # Assert model has learnt the correct noise level
     tf.debugging.assert_near(vfe_gp.mean.constant, data_constant, rtol=1e-1)
-    tf.debugging.assert_near(vfe_gp.noise, data_std, rtol=3e-1)
+    tf.debugging.assert_near(vfe_gp.noise, data_std, rtol=1e-1)
 
 
 # ==============================================================================
@@ -431,4 +431,4 @@ def test_vfe_gp_linear():
 
     tf.debugging.assert_near(vfe_gp.noise,
                              data_std,
-                             rtol=3e-1)
+                             rtol=1e-1)
