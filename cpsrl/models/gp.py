@@ -270,7 +270,7 @@ class VFEGP(tf.keras.Model):
         prior_train = self.mean(self.x_train)
         prior_pred = self.mean(x_pred)
         check_shape([prior_train, prior_pred, self.x_train, self.y_train],
-                    [('N', 1), ('N', 1), ('N', 'D'), ('N', 1)])
+                    [('N', 1), ('K', 1), ('N', 'D'), ('N', 1)])
         K_pred_pred = self.cov(x_pred, x_pred)
 
         # If there's no training data, return the prior
