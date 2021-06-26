@@ -24,11 +24,6 @@ VariableOrTensor = Union[tf.Variable, tf.Tensor]
 Transition = namedtuple("Transition", ("state", "action", "reward", "next_state"))
 
 
-class SampleCallable(Protocol):
-    def __call__(self, x: tf.Tensor, add_noise: bool) -> tf.Tensor:
-        ...
-
-
 # ==============================================================================
 # Helper for converting episode to list of tensors
 # ==============================================================================

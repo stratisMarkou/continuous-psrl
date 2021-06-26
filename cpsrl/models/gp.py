@@ -5,7 +5,7 @@ import numpy as np
 
 from cpsrl.models.mean import Mean
 from cpsrl.models.covariance import Covariance
-from cpsrl.helpers import check_shape, SampleCallable
+from cpsrl.helpers import check_shape
 from cpsrl.errors import ModelError
 
 
@@ -74,7 +74,7 @@ class VFEGPStack(tf.keras.Model):
         for vfe_gp in self.vfe_gps:
             vfe_gp.reset_inducing(x_ind=x_ind, num_ind=num_ind)
 
-    def sample_posterior(self, num_features: int) -> Union[Callable, SampleCallable]:
+    def sample_posterior(self, num_features: int) -> Callable:
         """
         Produces a posterior sample, using *num_features* random fourier
         features, returning the sample in the form of a Callable with signature:
@@ -248,7 +248,7 @@ class VFEGP(tf.keras.Model):
         The standard deviation of the Gaussian noise of the GP model.
         :return:
         """
-        return tf.squeeze(tf.math.exp(self.log_noise))
+        return tf.math.exp(self.log_noise)
 
     def post_pred(self, x_pred: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
         """
@@ -296,6 +296,7 @@ class VFEGP(tf.keras.Model):
         beta = tf.linalg.triangular_solve(tf.transpose(L, (1, 0)),
                                           beta,
                                           lower=False)
+
         mean = (K_pred_ind / self.noise ** 2 @ beta)
         print('mean.shape, prior_train.shape', mean.shape, prior_train.shape)
         mean = mean + prior_pred
@@ -368,8 +369,7 @@ class VFEGP(tf.keras.Model):
 
         return free_energy
         
-    def sample_posterior(self, num_features: int) \
-            -> Union[Callable, SampleCallable]:
+    def sample_posterior(self, num_features: int) -> Callable:
         """
         Produces a posterior sample, using *num_features* random fourier
         features, returning the sample in the form of a Callable with signature:
