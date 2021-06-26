@@ -7,7 +7,7 @@ import sys
 import tensorflow as tf
 
 from cpsrl.agents import RandomAgent, GPPSRLAgent
-from cpsrl.models.mean import LinearMean
+from cpsrl.models.mean import ConstantMean, LinearMean
 from cpsrl.models.covariance import EQ
 from cpsrl.models.gp import VFEGP, VFEGPStack
 from cpsrl.models.initial_distributions import IndependentGaussian
@@ -31,29 +31,47 @@ parser.add_argument("agent",
                     default="GPPSRL",
                     help="Agent name.")
 
-parser.add_argument("num_episodes", type=int, help="Number of episodes to play for.")
+parser.add_argument("num_episodes",
+                    type=int,
+                    help="Number of episodes to play for.")
+
+parser.add_argument("--sub_sampling_factor",
+                    type=int,
+                    default=2,
+                    help="Sub-samplinf factor of the environment.")
+
 parser.add_argument("--seed", type=int, default=0, help="Random seed.")
 
 parser.add_argument("--log_dir",
                     type=str,
                     default="logs",
                     help="Directory for storing logs.")
+
 parser.add_argument("--data_dir",
                     type=str,
                     default="data",
                     help="Directory for storing trajectory data.")
+
 parser.add_argument("--results_dir",
                     type=str,
                     default="results",
                     help="Directory for storing results.")
+
 parser.add_argument("--model_dir",
                     type=str,
                     default="models",
                     help="Directory for storing models.")
 
 # Environment parameters (for dynamics and rewards)
-parser.add_argument("--gamma", type=float, default=0.99, help="Discount factor.")
-parser.add_argument("--horizon", type=int, default=None, help="Env horizon.")
+parser.add_argument("--gamma",
+                    type=float,
+                    default=0.99,
+                    help="Discount factor.")
+
+parser.add_argument("--horizon",
+                    type=int,
+                    default=50,
+                    help="Environment horizon.")
 
 # Dynamics model parameters
 parser.add_argument("--dyn_trainable_mean",
@@ -140,7 +158,7 @@ parser.add_argument("--init_mean",
 
 parser.add_argument("--init_scale",
                     type=float,
-                    default=1.0,
+                    default=0.05,
                     help="Scale for initial distribution.")
 
 # Policy parameters
@@ -157,7 +175,7 @@ parser.add_argument("--trainable_policy",
 # Update/optimization parameters
 parser.add_argument("--num_steps_dyn",
                     type=int,
-                    default=1000,
+                    default=500,
                     help="Number of optimization steps for dynamics model.")
 
 parser.add_argument("--learn_rate_dyn",
@@ -173,7 +191,7 @@ parser.add_argument("--num_ind_dyn",
 
 parser.add_argument("--num_steps_rew",
                     type=int,
-                    default=1000,
+                    default=500,
                     help="Number of optimization steps for rewards model.")
 
 parser.add_argument("--learn_rate_rew",
@@ -204,7 +222,7 @@ parser.add_argument("--num_steps_policy",
 
 parser.add_argument("--learn_rate_policy",
                     type=float,
-                    default=3e-4,
+                    default=1e-2,
                     help="Learning rate for optimizing policy.")
 
 # =============================================================================
@@ -225,15 +243,21 @@ print(vars(args))
 
 # Set up env
 env_rng = next(rng_seq)
+
 if args.env == "MountainCar":
-    env = MountainCar(rng=env_rng, horizon=args.horizon)
+    env = MountainCar(rng=env_rng,
+                      horizon=args.horizon,
+                      sub_sampling_factor=args.sub_sampling_factor)
+
 elif args.env == "CartPole":
     env = CartPole(rng=env_rng)
+
 else:
     raise ValueError(f"Invalid environment: {args.env}")
 
 # Set up models
-S, A = len(env.state_space), len(env.action_space)
+S = len(env.state_space)
+A = len(env.action_space)
 
 # 1. Dynamics models
 dyn_means = [LinearMean(input_dim=S + A,
@@ -261,9 +285,9 @@ dyn_vfe_gps = [VFEGP(mean=dyn_means[i],
 dynamics_model = VFEGPStack(vfe_gps=dyn_vfe_gps, dtype=dtype)
 
 # 2. Reward model
-rew_mean = LinearMean(input_dim=S,
-                      trainable=args.rew_trainable_mean,
-                      dtype=dtype)
+rew_mean = ConstantMean(input_dim=S,
+                        trainable=args.rew_trainable_mean,
+                        dtype=dtype)
 
 rew_cov = EQ(log_coeff=args.rew_log_coeff,
              log_scales=S * [args.rew_log_scale],
@@ -297,8 +321,8 @@ initial_distribution = IndependentGaussian(state_space=env.state_space,
                                            dtype=dtype)
 
 # TODO: choose number of inducing points dynamically
-num_ind_dyn = args.num_ind_dyn or 100
-num_ind_rew = args.num_ind_rew or 100
+num_ind_dyn = args.num_ind_dyn or 50
+num_ind_rew = args.num_ind_rew or 50
 
 update_params = {
     "num_steps_dyn": args.num_steps_dyn,
@@ -325,8 +349,10 @@ if args.agent == "GPPSRL":
                         policy=policy,
                         update_params=update_params,
                         dtype=dtype)
+
 elif args.agent == "Random":
     agent = RandomAgent(action_space=env.action_space, rng=agent_rng)
+
 else:
     raise ValueError(f"Invalid agent: {args.agent}")
 
@@ -336,6 +362,7 @@ else:
 
 # For each episode
 for i in range(args.num_episodes):
+
     # Play episode
     cumulative_reward, episode = play_episode(agent=agent, environment=env)
 
@@ -346,16 +373,15 @@ for i in range(args.num_episodes):
     agent.update()
 
     cumulative_reward = cumulative_reward.item()
-    print()
-    print(f'Episode {i} | Return: {cumulative_reward:.3f}')
-    print()
+    print(f'\nEpisode {i} | Return: {cumulative_reward:.3f}\n')
 
     # Save episode
-    with open(os.path.join(args.data_dir, exp_name + f"_ep-{i}.pkl"), mode="wb") as f:
+    with open(os.path.join(args.data_dir, f"{exp_name}_ep-{i}.pkl"),
+              mode="wb") as f:
         pickle.dump({"Episode": i, "Transitions": episode}, f)
 
     # Save aggregated results of the episode
-    with open(os.path.join(args.results_dir, exp_name + ".txt"), mode="a") as f:
+    with open(os.path.join(args.results_dir, f"{exp_name}.txt"), mode="a") as f:
         f.write(json.dumps({"Episode": i, "Return": cumulative_reward}))
         f.write("\n")
 

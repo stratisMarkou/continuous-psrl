@@ -16,7 +16,6 @@ Things we would like to add to the codebase:
 ## Fixes to get the agent working
 
 Modifications, sanity checks and fixes to get the basic agent working:
-* Increase subsampling factor to 2 or 3, reduce the horizon
 * Ensure models and policy train properly:
   - Train GP models via LBFGS
   - Check the noise level learnt by the models (if this is too high, it could make optimisation very difficult)

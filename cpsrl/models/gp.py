@@ -427,7 +427,7 @@ class VFEGP(tf.keras.Model):
 
             # Check input shape
             check_shape([prior_mean, self.x_train, x],
-                        [(-1, 'D'), (-1, 'D'), (-1, 'D')])
+                        [(-1, 1), (-1, 'D'), (-1, 'D')])
 
             # Covariance between inputs and inducing points
             K_x_ind = self.cov(x, self.x_ind)
