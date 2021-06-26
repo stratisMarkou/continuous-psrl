@@ -1,9 +1,11 @@
-import tensorflow as tf
 from cpsrl.models.mean import ConstantMean, LinearMean
 from cpsrl.models.covariance import EQ
 from cpsrl.models.gp import VFEGP, VFEGPStack
 from cpsrl.helpers import check_shape
 from cpsrl.errors import ModelError
+
+import tensorflow as tf
+import numpy as np
 
 DTYPE = tf.float64
 
@@ -20,19 +22,25 @@ def test_constant_mean():
     :return:
     """
 
-    num_points = 5
-    input_dim = 3
+    # Set random seeds
+    np.random.seed(0)
+    tf.random.set_seed(0)
 
-    x_rand = tf.random.uniform(shape=(num_points, input_dim), dtype=DTYPE)
+    max_points = 100
 
-    constant_mean = ConstantMean(input_dim=input_dim,
-                                 trainable=False,
-                                 dtype=DTYPE)
+    for D in range(1, 10):
 
-    output = constant_mean(x_rand)
+        N = np.random.randint(1, max_points)
 
-    check_shape([x_rand, output],
-                [(num_points, input_dim), (num_points, 1)])
+        x_rand = tf.random.uniform(shape=(N, D), dtype=DTYPE)
+
+        constant_mean = ConstantMean(input_dim=D,
+                                     trainable=False,
+                                     dtype=DTYPE)
+
+        output = constant_mean(x_rand)
+
+        check_shape([x_rand, output], [(N, D), (N, 1)])
 
 
 def test_linear_mean():
@@ -42,19 +50,25 @@ def test_linear_mean():
     :return:
     """
 
-    num_points = 5
-    input_dim = 3
+    # Set random seeds
+    np.random.seed(0)
+    tf.random.set_seed(0)
 
-    x_rand = tf.random.uniform(shape=(num_points, input_dim), dtype=DTYPE)
+    max_points = 100
 
-    linear_mean = LinearMean(input_dim=input_dim,
-                             trainable=False,
-                             dtype=DTYPE)
+    for D in range(1, 10):
 
-    output = linear_mean(x_rand)
+        N = np.random.randint(1, max_points)
 
-    check_shape([x_rand, output],
-                [(num_points, input_dim), (num_points, 1)])
+        x_rand = tf.random.uniform(shape=(N, D), dtype=DTYPE)
+
+        linear_mean = LinearMean(input_dim=D,
+                                 trainable=False,
+                                 dtype=DTYPE)
+
+        output = linear_mean(x_rand)
+
+        check_shape([x_rand, output], [(N, D), (N, 1)])
 
 
 # ==============================================================================
@@ -68,27 +82,35 @@ def test_eq_cov():
     :return:
     """
 
-    N1 = 10
-    N2 = 4
-    D = 3
+    # Set random seeds
+    np.random.seed(0)
+    tf.random.set_seed(0)
 
-    x1 = tf.random.uniform(shape=(N1, D), dtype=DTYPE)
-    x2 = tf.random.uniform(shape=(N2, D), dtype=DTYPE)
+    max_points = 100
 
-    # Check EQ covariance works
-    log_coeff = 0.
-    log_scales = D * [-1.]
+    for D in range(1, 10):
 
-    # Check EQ kernel works
-    eq = EQ(log_coeff=log_coeff,
-            log_scales=log_scales,
-            trainable=False,
-            dtype=DTYPE)
+        N1 = np.random.randint(1, max_points)
+        N2 = np.random.randint(1, max_points)
 
-    cov = eq(x1, x2)
+        x1 = tf.random.uniform(shape=(N1, D), dtype=DTYPE)
+        x2 = tf.random.uniform(shape=(N2, D), dtype=DTYPE)
 
-    check_shape([x1, x2, cov],
-                [(N1, D), (N2, D), (N1, N2)])
+        # Check EQ covariance works
+        log_coeff = 0.
+        log_scales = D * [0.]
+
+        # Check EQ kernel works
+        eq = EQ(log_coeff=log_coeff,
+                log_scales=log_scales,
+                trainable=False,
+                dtype=DTYPE)
+
+        cov = eq(x1, x2)
+        cov_diag = eq(x1, x1, diag=True)
+
+        check_shape([x1, x2, cov, cov_diag],
+                    [(N1, D), (N2, D), (N1, N2), (N1,)])
 
 
 # ==============================================================================
