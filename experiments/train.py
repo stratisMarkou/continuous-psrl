@@ -146,20 +146,25 @@ parser.add_argument("--rew_log_noise",
                     help="Log noise for rewards model.")
 
 # Initial distribution parameters
-parser.add_argument("--init_trainable",
-                    dest="init_trainable",
-                    action="store_true",
-                    help="Optimize initial distribution.")
-
-parser.add_argument("--init_mean",
+parser.add_argument("--init_mu0",
                     type=float,
                     default=0.0,
                     help="Mean for initial distribution.")
 
-parser.add_argument("--init_scale",
+parser.add_argument("--init_kappa0",
                     type=float,
-                    default=0.05,
-                    help="Scale for initial distribution.")
+                    default=1.0,
+                    help="Mean for initial distribution.")
+
+parser.add_argument("--init_alpha0",
+                    type=float,
+                    default=1.0,
+                    help="Mean for initial distribution.")
+
+parser.add_argument("--init_beta0",
+                    type=float,
+                    default=1.0,
+                    help="Mean for initial distribution.")
 
 # Policy parameters
 parser.add_argument("--hidden_size",
@@ -311,13 +316,17 @@ policy = FCNPolicy(hidden_sizes=[args.hidden_size] * 2,
                    dtype=dtype)
 
 # 3. Initial distribution
-init_means = args.init_mean * tf.ones(shape=(S,), dtype=dtype)
-init_scales = args.init_scale * tf.ones(shape=(S,), dtype=dtype)
+init_mu0 = args.init_mu0 * tf.ones(shape=(S,), dtype=dtype)
+init_kappa0 = args.init_kappa0 * tf.ones(shape=(S,), dtype=dtype)
+init_alpha0 = args.init_kappa0 * tf.ones(shape=(S,), dtype=dtype)
+init_beta0 = args.init_kappa0 * tf.ones(shape=(S,), dtype=dtype)
 
 initial_distribution = IndependentGaussian(state_space=env.state_space,
-                                           mean=init_means,
-                                           scales=init_scales,
-                                           trainable=args.init_trainable,
+                                           mu0=init_mu0,
+                                           kappa0=init_kappa0,
+                                           alpha0=init_alpha0,
+                                           beta0=init_beta0,
+                                           trainable=True,
                                            dtype=dtype)
 
 # TODO: choose number of inducing points dynamically

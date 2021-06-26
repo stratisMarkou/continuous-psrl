@@ -52,30 +52,30 @@ class IndependentGaussian(InitialStateDistribution):
 
     def __init__(self,
                  state_space: List[Tuple[float, float]],
-                 mu: tf.Tensor,
-                 kappa: tf.Tensor,
-                 alpha: tf.Tensor,
-                 beta: tf.Tensor,
+                 mu0: tf.Tensor,
+                 kappa0: tf.Tensor,
+                 alpha0: tf.Tensor,
+                 beta0: tf.Tensor,
                  trainable: bool,
                  dtype: tf.DType):
 
         super().__init__(state_space=state_space, dtype=dtype)
 
         # Check shapes of the NG prior parameters
-        check_shape([mu, kappa, alpha, beta],
+        check_shape([mu0, kappa0, alpha0, beta0],
                     [('S',), ('S',), ('S',), ('S',)])
 
         # Set NG prior parameters
-        self.mu0 = mu
-        self.kappa0 = kappa
-        self.alpha0 = alpha
-        self.beta0 = beta
+        self.mu0 = mu0
+        self.kappa0 = kappa0
+        self.alpha0 = alpha0
+        self.beta0 = beta0
 
         # Set NG posterior parameters equal to prior
-        self.mu = mu
-        self.kappa = kappa
-        self.alpha = alpha
-        self.beta = beta
+        self.mu = mu0
+        self.kappa = kappa0
+        self.alpha = alpha0
+        self.beta = beta0
 
         self.trainable = trainable
 
@@ -89,10 +89,14 @@ class IndependentGaussian(InitialStateDistribution):
         :return:
         """
 
+        if not self.trainable:
+            raise InitialDistributionError("Attempted to update non-trainable "
+                                           "initial distribution.")
+
         if self.x_train.shape[0]:
-            raise InitialDistributionError("Attempted to update initial "
-                                           "distribution with no training "
-                                           "data.")
+            warnings.warn("Attempted to update initial "
+                          "distribution with no training data.")
+            return
 
         # Number of training points
         N = self.x_train.shape[0]
@@ -141,15 +145,15 @@ class IndependentGaussian(InitialStateDistribution):
                     [(self.S,), (self.S,), (self.S,)])
 
         # Compute scale of mean of initial distribution
-        mean_scale = (self.kappa * self.precision) ** -0.5
+        mean_scale = (self.kappa * precision) ** -0.5
 
         # Sample precision from Normal distribution
-        normal_dist = tfd.MultivariateNormalDiag(mean=self.mu,
+        normal_dist = tfd.MultivariateNormalDiag(loc=self.mu,
                                                  scale_diag=mean_scale)
         mean = normal_dist.sample()
 
         # Create initial distribution and return
-        post_sample = tfd.MultivariateNormalDiag(mean=mean,
-                                                 scale_diag=precision**-1)
+        post_sample = tfd.MultivariateNormalDiag(loc=mean,
+                                                 scale_diag=precision**-0.5)
 
         return post_sample

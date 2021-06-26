@@ -93,7 +93,7 @@ class GPPSRLAgent(Agent):
         self.rewards_model.reset_inducing(num_ind=params["num_ind_rew"])
 
         # Train the initial distribution, dynamics and reward models
-        self.initial_distribution.train()
+        self.initial_distribution.update()
 
         print("Updating dynamics model...")
         self.train_model(self.dynamics_model,
@@ -161,6 +161,7 @@ class GPPSRLAgent(Agent):
         # Draw dynamics and rewards samples
         dyn_sample = self.dynamics_model.sample_posterior(num_features)
         rew_sample = self.rewards_model.sample_posterior(num_features)
+        initial_distribution = self.initial_distribution.posterior_sample()
 
         # Initialise optimiser
         optimizer = tf.optimizers.Adam(learn_rate)
@@ -173,7 +174,7 @@ class GPPSRLAgent(Agent):
                 tape.watch(self.policy.trainable_variables)
 
                 # Draw initial states s0
-                s0 = self.initial_distribution.sample(num_rollouts)
+                s0 = initial_distribution.sample(num_rollouts)
 
                 # Perform rollouts
                 rollout = self.rollout(dynamics_sample=dyn_sample,
