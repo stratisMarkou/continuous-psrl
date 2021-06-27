@@ -94,7 +94,7 @@ class IndependentGaussian(InitialStateDistribution):
             raise InitialDistributionError("Attempted to update non-trainable "
                                            "initial distribution.")
 
-        if self.x_train.shape[0]:
+        if self.x_train.shape[0] == 0:
             warnings.warn("Attempted to update initial "
                           "distribution with no training data.")
             return
@@ -205,24 +205,18 @@ class IndependentGaussianMAPMean(IndependentGaussian):
         gamma_dist = tfd.Gamma(concentration=self.alpha, rate=self.beta)
         precision = gamma_dist.sample()
 
+
         # Check shape of precision and kappa/mu posterior parameters
         check_shape([precision, self.kappa, self.mu],
                     [(self.S,), (self.S,), (self.S,)])
 
-        # Compute scale of mean of initial distribution
-        if np.any(self.kappa.numpy() < 1.):
-            mean = self.mu0
-
-        else:
-            mean_scale = (self.kappa * precision) ** -0.5
-
-            # Sample precision from Normal distribution
-            normal_dist = tfd.MultivariateNormalDiag(loc=self.mu,
-                                                     scale_diag=mean_scale)
-            mean = normal_dist.sample()
+        # Set mean to MAP
+        mean = self.mu0 if np.any(self.kappa.numpy() < 1.) else self.mu
 
         # Create initial distribution and return
         post_sample = tfd.MultivariateNormalDiag(loc=mean,
                                                  scale_diag=precision**-0.5)
+
+        print(f"\nInitial distribution: mean {mean}, std {precision**-0.5}\n")
 
         return post_sample

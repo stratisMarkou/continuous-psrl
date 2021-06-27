@@ -96,12 +96,12 @@ parser.add_argument("--dyn_trainable_noise",
 
 parser.add_argument("--dyn_log_coeff",
                     type=float,
-                    default=-1.0,
+                    default=0.0,
                     help="Log coefficients for dynamics model.")
 
 parser.add_argument("--dyn_log_scale",
                     type=float,
-                    default=-1.0,
+                    default=0.0,
                     help="Log scale for dynamics model.")
 
 parser.add_argument("--dyn_log_noise",
@@ -153,12 +153,12 @@ parser.add_argument("--init_mu0",
 
 parser.add_argument("--init_alpha0",
                     type=float,
-                    default=1.0,
+                    default=10.0,
                     help="Mean for initial distribution.")
 
 parser.add_argument("--init_beta0",
                     type=float,
-                    default=1.0,
+                    default=0.1,
                     help="Mean for initial distribution.")
 
 # Policy parameters
@@ -175,7 +175,7 @@ parser.add_argument("--trainable_policy",
 # Update/optimization parameters
 parser.add_argument("--num_steps_dyn",
                     type=int,
-                    default=500,
+                    default=1000,
                     help="Number of optimization steps for dynamics model.")
 
 parser.add_argument("--learn_rate_dyn",
@@ -222,7 +222,7 @@ parser.add_argument("--num_steps_policy",
 
 parser.add_argument("--learn_rate_policy",
                     type=float,
-                    default=1e-2,
+                    default=1e-1,
                     help="Learning rate for optimizing policy.")
 
 # =============================================================================
@@ -368,14 +368,14 @@ for i in range(args.num_episodes):
     # Play episode
     cumulative_reward, episode = play_episode(agent=agent, environment=env)
 
+    cumulative_reward = cumulative_reward.item()
+    print(f'\nEpisode {i} | Return: {cumulative_reward:.3f}\n')
+
     # Observe episode
     agent.observe(episode)
 
     # Train agent models and/or policy
     agent.update()
-
-    cumulative_reward = cumulative_reward.item()
-    print(f'\nEpisode {i} | Return: {cumulative_reward:.3f}\n')
 
     # Save episode
     with open(os.path.join(args.data_dir, f"{exp_name}_ep-{i}.pkl"),
