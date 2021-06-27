@@ -49,6 +49,7 @@ class GPPSRLAgent(Agent):
         self.dynamics_model = dynamics_model
         self.rewards_model = rewards_model
         self.policy = policy
+        self.num_observations = 0
 
         # Set dtype and training parameters for models
         self.dtype = dtype
@@ -65,6 +66,9 @@ class GPPSRLAgent(Agent):
         return action
 
     def observe(self, episode: List[Transition]):
+
+        # Increment number of observations
+        self.num_observations = self.num_observations + len(episode)
 
         # Convert episode to tensors, to update the models' training data
         s, sa, s_, sas_, r = convert_episode_to_tensors(episode,
@@ -95,14 +99,22 @@ class GPPSRLAgent(Agent):
         # Train the initial distribution, dynamics and reward models
         self.initial_distribution.update()
 
+        # Number of inducing points to use
+        num_ind = self.num_observations
+
+        print(f"Using {num_ind} inducing points,")
+
         print("Updating dynamics model...")
+        self.dynamics_model.reset_inducing(num_ind=num_ind)
         self.train_model(self.dynamics_model,
                          num_steps=params["num_steps_dyn"],
                          learn_rate=params["learn_rate_dyn"])
+
         for vfe_gp in self.dynamics_model.vfe_gps:
             print(vfe_gp.cov.scales)
 
         print("\nUpdating rewards model...")
+        self.rewards_model.reset_inducing(num_ind=num_ind)
         self.train_model(self.rewards_model,
                          num_steps=params["num_steps_rew"],
                          learn_rate=params["learn_rate_rew"])
@@ -266,7 +278,7 @@ class GPPSRLAgent(Agent):
             
             # Compute next state and reward
             s_ = s + ds
-            r = rewards_sample(s_, add_noise=True)
+            r = rewards_sample(s_, add_noise=False)
 
             # Check shapes of next state and rewards
             check_shape([s, s_, r], [(R, S), (R, S), (R, 1)])

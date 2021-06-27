@@ -96,7 +96,7 @@ parser.add_argument("--dyn_trainable_noise",
 
 parser.add_argument("--dyn_log_coeff",
                     type=float,
-                    default=0.0,
+                    default=-1.0,
                     help="Log coefficients for dynamics model.")
 
 parser.add_argument("--dyn_log_scale",
@@ -137,7 +137,7 @@ parser.add_argument("--rew_log_coeff",
 
 parser.add_argument("--rew_log_scale",
                     type=float,
-                    default=-1.0,
+                    default=0.0,
                     help="Log scale for rewards model.")
 
 parser.add_argument("--rew_log_noise",
@@ -153,7 +153,7 @@ parser.add_argument("--init_mu0",
 
 parser.add_argument("--init_alpha0",
                     type=float,
-                    default=10.0,
+                    default=100.0,
                     help="Mean for initial distribution.")
 
 parser.add_argument("--init_beta0",
@@ -175,7 +175,7 @@ parser.add_argument("--trainable_policy",
 # Update/optimization parameters
 parser.add_argument("--num_steps_dyn",
                     type=int,
-                    default=1000,
+                    default=2000,
                     help="Number of optimization steps for dynamics model.")
 
 parser.add_argument("--learn_rate_dyn",
