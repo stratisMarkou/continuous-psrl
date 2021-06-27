@@ -5,6 +5,7 @@ import warnings
 from cpsrl.helpers import check_shape
 from cpsrl.errors import InitialDistributionError
 
+import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
 
@@ -103,15 +104,19 @@ class IndependentGaussian(InitialStateDistribution):
 
         # Mean, sum and variance of initial states (entry-wise)
         x_mean = tf.reduce_mean(self.x_train, axis=0)
-        x_sum = N * x_mean
         x_var = tf.math.reduce_std(self.x_train, axis=0) ** 2
 
         # Check shape of x_sum, x_var and prior parameters
-        check_shape([x_sum, self.mu0, self.kappa0, self.alpha0, self.beta0],
-                    [("S",), ("S",), ("S",), ("S",), ("S",)])
+        check_shape([self.mu0,
+                     self.kappa0,
+                     self.alpha0,
+                     self.beta0,
+                     x_mean,
+                     x_var],
+                    [("S",), ("S",), ("S",), ("S",), ("S",), ("S",)])
 
         # Update posterior mu parameter
-        self.mu = (self.kappa0 * self.mu0 + x_sum) / (self.kappa0 + N)
+        self.mu = (self.kappa0 * self.mu0 + N * x_mean) / (self.kappa0 + N)
 
         # Update posterior kappa parameter
         self.kappa = self.kappa0 + N
@@ -121,7 +126,7 @@ class IndependentGaussian(InitialStateDistribution):
 
         # Update posterior beta parameter
         diff = x_mean - self.mu0
-        self.beta = self.beta0 + 0.5 * x_var + \
+        self.beta = self.beta0 + 0.5 * N * x_var + \
                     0.5 * N * self.kappa0 * diff ** 2 / (self.kappa0 + N)
 
     def posterior_sample(self) -> tfd.Distribution:
@@ -151,6 +156,70 @@ class IndependentGaussian(InitialStateDistribution):
         normal_dist = tfd.MultivariateNormalDiag(loc=self.mu,
                                                  scale_diag=mean_scale)
         mean = normal_dist.sample()
+
+        # Create initial distribution and return
+        post_sample = tfd.MultivariateNormalDiag(loc=mean,
+                                                 scale_diag=precision**-0.5)
+
+        return post_sample
+
+
+# ==============================================================================
+# Gaussian initial distribution
+# ==============================================================================
+
+class IndependentGaussianMAPMean(IndependentGaussian):
+
+    def __init__(self,
+                 state_space: List[Tuple[float, float]],
+                 mu0: tf.Tensor,
+                 alpha0: tf.Tensor,
+                 beta0: tf.Tensor,
+                 trainable: bool,
+                 dtype: tf.DType):
+
+        # For MAP estimate of mean, kappa is set to 0
+        kappa0 = tf.zeros_like(mu0, dtype=dtype)
+
+        super().__init__(state_space=state_space,
+                         mu0=mu0,
+                         kappa0=kappa0,
+                         alpha0=alpha0,
+                         beta0=beta0,
+                         trainable=trainable,
+                         dtype=dtype)
+
+    def posterior_sample(self) -> tfd.Distribution:
+        """
+        Samples an initial distribution from the posterior over initial
+        distributions, returning the result as a tfd.Distribution, which can
+        itself be sampled and used for initialising a rollout.
+
+        :return:
+        """
+
+        # Check shape of alpha and beta posterior parameters
+        check_shape([self.alpha, self.beta], [(self.S,), (self.S,)])
+
+        # Sample precision from Gamma distribution
+        gamma_dist = tfd.Gamma(concentration=self.alpha, rate=self.beta)
+        precision = gamma_dist.sample()
+
+        # Check shape of precision and kappa/mu posterior parameters
+        check_shape([precision, self.kappa, self.mu],
+                    [(self.S,), (self.S,), (self.S,)])
+
+        # Compute scale of mean of initial distribution
+        if np.any(self.kappa.numpy() < 1.):
+            mean = self.mu0
+
+        else:
+            mean_scale = (self.kappa * precision) ** -0.5
+
+            # Sample precision from Normal distribution
+            normal_dist = tfd.MultivariateNormalDiag(loc=self.mu,
+                                                     scale_diag=mean_scale)
+            mean = normal_dist.sample()
 
         # Create initial distribution and return
         post_sample = tfd.MultivariateNormalDiag(loc=mean,

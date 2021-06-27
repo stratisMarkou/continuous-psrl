@@ -10,7 +10,7 @@ from cpsrl.agents import RandomAgent, GPPSRLAgent
 from cpsrl.models.mean import ConstantMean, LinearMean
 from cpsrl.models.covariance import EQ
 from cpsrl.models.gp import VFEGP, VFEGPStack
-from cpsrl.models.initial_distributions import IndependentGaussian
+from cpsrl.models.initial_distributions import IndependentGaussianMAPMean
 from cpsrl.policies.policies import FCNPolicy
 from cpsrl.environments import MountainCar, CartPole
 from cpsrl.train_utils import play_episode
@@ -149,11 +149,6 @@ parser.add_argument("--rew_log_noise",
 parser.add_argument("--init_mu0",
                     type=float,
                     default=0.0,
-                    help="Mean for initial distribution.")
-
-parser.add_argument("--init_kappa0",
-                    type=float,
-                    default=1.0,
                     help="Mean for initial distribution.")
 
 parser.add_argument("--init_alpha0",
@@ -317,17 +312,15 @@ policy = FCNPolicy(hidden_sizes=[args.hidden_size] * 2,
 
 # 3. Initial distribution
 init_mu0 = args.init_mu0 * tf.ones(shape=(S,), dtype=dtype)
-init_kappa0 = args.init_kappa0 * tf.ones(shape=(S,), dtype=dtype)
-init_alpha0 = args.init_kappa0 * tf.ones(shape=(S,), dtype=dtype)
-init_beta0 = args.init_kappa0 * tf.ones(shape=(S,), dtype=dtype)
+init_alpha0 = args.init_alpha0 * tf.ones(shape=(S,), dtype=dtype)
+init_beta0 = args.init_beta0 * tf.ones(shape=(S,), dtype=dtype)
 
-initial_distribution = IndependentGaussian(state_space=env.state_space,
-                                           mu0=init_mu0,
-                                           kappa0=init_kappa0,
-                                           alpha0=init_alpha0,
-                                           beta0=init_beta0,
-                                           trainable=True,
-                                           dtype=dtype)
+initial_distribution = IndependentGaussianMAPMean(state_space=env.state_space,
+                                                  mu0=init_mu0,
+                                                  alpha0=init_alpha0,
+                                                  beta0=init_beta0,
+                                                  trainable=True,
+                                                  dtype=dtype)
 
 # TODO: choose number of inducing points dynamically
 num_ind_dyn = args.num_ind_dyn or 50

@@ -99,11 +99,14 @@ class GPPSRLAgent(Agent):
         self.train_model(self.dynamics_model,
                          num_steps=params["num_steps_dyn"],
                          learn_rate=params["learn_rate_dyn"])
+        for vfe_gp in self.dynamics_model.vfe_gps:
+            print(vfe_gp.cov.scales)
 
         print("\nUpdating rewards model...")
         self.train_model(self.rewards_model,
                          num_steps=params["num_steps_rew"],
                          learn_rate=params["learn_rate_rew"])
+        print(self.rewards_model.cov.scales)
 
         # Optimise the policy
         print("\nUpdating policy...")
