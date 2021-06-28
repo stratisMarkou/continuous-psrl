@@ -1,4 +1,4 @@
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 
 import tensorflow as tf
 
@@ -9,9 +9,9 @@ from cpsrl.helpers import check_shape, VariableOrTensor
 # Base mean class
 # ==============================================================================
 
-class Mean(tf.keras.Model):
+class Mean(ABC, tf.keras.Model):
 
-    def __init__(self, dtype: tf.DType, name='mean'):
+    def __init__(self, dtype: tf.DType, name="mean"):
 
         super().__init__(name=name, dtype=dtype)
 
@@ -19,10 +19,14 @@ class Mean(tf.keras.Model):
     def __call__(self, x: VariableOrTensor) -> tf.Tensor:
         pass
 
+    @abstractmethod
+    def parameter_summary(self) -> str:
+        pass
 
 # ==============================================================================
 # Constant mean class
 # ==============================================================================
+
 
 class ConstantMean(Mean):
 
@@ -44,6 +48,9 @@ class ConstantMean(Mean):
 
         return self.constant * tf.ones((x.shape[0], 1), dtype=self.dtype)
 
+    def parameter_summary(self) -> str:
+        return f"Constant mean \n" \
+               f"\t constant: {self.constant.numpy()}"
 
 # ==============================================================================
 # Linear mean class
@@ -75,3 +82,8 @@ class LinearMean(Mean):
         check_shape(x, (-1, self.input_dim))
 
         return x @ self.coefficients + self.constant
+
+    def parameter_summary(self) -> str:
+        return f"Linear mean\n" \
+               f"\tconstant: {self.constant.numpy()}\n" \
+               f"\tcoefficients: {self.coefficients.numpy()[:, 0]}"

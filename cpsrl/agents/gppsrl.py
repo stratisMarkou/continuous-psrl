@@ -1,4 +1,5 @@
 from typing import Callable
+import warnings
 
 from cpsrl.policies.policies import FCNPolicy
 from cpsrl.agents.agent import Agent
@@ -25,7 +26,8 @@ class GPPSRLAgent(Agent):
                  rewards_model: VFEGP,
                  policy: FCNPolicy,
                  update_params: dict,
-                 dtype: tf.DType):
+                 dtype: tf.DType,
+                 max_ind: int = None):
         """
         PSRL agent using Gaussian Processes for the dynamics and rewards models.
 
@@ -37,6 +39,7 @@ class GPPSRLAgent(Agent):
         :param policy: policy to use
         :param update_params: parameters required in the update step
         :param dtype: data type of the agent, tf.float32 or tf.float64
+        :param max_ind: max # of inducing points, set to training data if None
         """
 
         # Use superclass init
@@ -45,6 +48,7 @@ class GPPSRLAgent(Agent):
                          gamma=gamma)
 
         # Set dynamics and rewards models and policy
+        self.max_ind = max_ind
         self.initial_distribution = initial_distribution
         self.dynamics_model = dynamics_model
         self.rewards_model = rewards_model
@@ -91,42 +95,40 @@ class GPPSRLAgent(Agent):
             - Optimises the policy
         """
 
-        # Update pseudopoints of the GP models
-        params = self.update_params
-        self.dynamics_model.reset_inducing(num_ind=params["num_ind_dyn"])
-        self.rewards_model.reset_inducing(num_ind=params["num_ind_rew"])
-
         # Train the initial distribution, dynamics and reward models
         self.initial_distribution.update()
 
-        # Number of inducing points to use
-        num_ind = self.num_observations
+        # Update inducing points
+        max_ind = self.num_observations if self.max_ind is None else \
+                  self.max_ind
+        num_ind = min(self.num_observations, max_ind)
 
-        print(f"Using {num_ind} inducing points,")
+        self.dynamics_model.reset_inducing(num_ind=num_ind)
+        self.rewards_model.reset_inducing(num_ind=num_ind)
+
+        print(f"\nUsing {num_ind} inducing points.\n")
 
         print("Updating dynamics model...")
         self.dynamics_model.reset_inducing(num_ind=num_ind)
         self.train_model(self.dynamics_model,
-                         num_steps=params["num_steps_dyn"],
-                         learn_rate=params["learn_rate_dyn"])
-
-        for vfe_gp in self.dynamics_model.vfe_gps:
-            print(vfe_gp.cov.scales)
+                         num_steps=self.update_params["num_steps_dyn"],
+                         learn_rate=self.update_params["learn_rate_dyn"])
+        print(self.dynamics_model.parameter_summary())
 
         print("\nUpdating rewards model...")
         self.rewards_model.reset_inducing(num_ind=num_ind)
         self.train_model(self.rewards_model,
-                         num_steps=params["num_steps_rew"],
-                         learn_rate=params["learn_rate_rew"])
-        print(self.rewards_model.cov.scales)
+                         num_steps=self.update_params["num_steps_rew"],
+                         learn_rate=self.update_params["learn_rate_rew"])
+        print(self.rewards_model.parameter_summary())
 
         # Optimise the policy
         print("\nUpdating policy...")
         self.policy.reset()
-        self.optimise_policy(num_rollouts=params["num_rollouts"],
-                             num_features=params["num_features"],
-                             num_steps=params["num_steps_policy"],
-                             learn_rate=params["learn_rate_policy"])
+        self.optimise_policy(num_rollouts=self.update_params["num_rollouts"],
+                             num_features=self.update_params["num_features"],
+                             num_steps=self.update_params["num_steps_policy"],
+                             learn_rate=self.update_params["learn_rate_policy"])
 
     def train_model(self,
                     model: Union[VFEGP, VFEGPStack],
@@ -134,8 +136,8 @@ class GPPSRLAgent(Agent):
                     learn_rate: float) -> float:
 
         if not model.trainable_variables:
-            raise AgentError("Attempted to train model with no trainable "
-                             "parameters.")
+            warnings.warn("Attempted to train model with no trainable "
+                           "parameters. Skipping training...")
 
         # Initialise optimiser
         optimizer = tf.optimizers.Adam(learn_rate)

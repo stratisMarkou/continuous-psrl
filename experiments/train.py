@@ -37,10 +37,13 @@ parser.add_argument("num_episodes",
 
 parser.add_argument("--sub_sampling_factor",
                     type=int,
-                    default=2,
+                    default=3,
                     help="Sub-samplinf factor of the environment.")
 
-parser.add_argument("--seed", type=int, default=0, help="Random seed.")
+parser.add_argument("--seed",
+                    type=int,
+                    default=0,
+                    help="Random seed.")
 
 parser.add_argument("--log_dir",
                     type=str,
@@ -70,7 +73,7 @@ parser.add_argument("--gamma",
 
 parser.add_argument("--horizon",
                     type=int,
-                    default=50,
+                    default=100,
                     help="Environment horizon.")
 
 # Dynamics model parameters
@@ -101,7 +104,7 @@ parser.add_argument("--dyn_log_coeff",
 
 parser.add_argument("--dyn_log_scale",
                     type=float,
-                    default=0.0,
+                    default=-1.0,
                     help="Log scale for dynamics model.")
 
 parser.add_argument("--dyn_log_noise",
@@ -137,12 +140,12 @@ parser.add_argument("--rew_log_coeff",
 
 parser.add_argument("--rew_log_scale",
                     type=float,
-                    default=0.0,
+                    default=-1.0,
                     help="Log scale for rewards model.")
 
 parser.add_argument("--rew_log_noise",
                     type=float,
-                    default=-2.0,
+                    default=-4.0,
                     help="Log noise for rewards model.")
 
 # Initial distribution parameters
@@ -153,12 +156,12 @@ parser.add_argument("--init_mu0",
 
 parser.add_argument("--init_alpha0",
                     type=float,
-                    default=100.0,
+                    default=1000.0,
                     help="Mean for initial distribution.")
 
 parser.add_argument("--init_beta0",
                     type=float,
-                    default=0.1,
+                    default=0.01,
                     help="Mean for initial distribution.")
 
 # Policy parameters
@@ -175,19 +178,13 @@ parser.add_argument("--trainable_policy",
 # Update/optimization parameters
 parser.add_argument("--num_steps_dyn",
                     type=int,
-                    default=2000,
+                    default=1000,
                     help="Number of optimization steps for dynamics model.")
 
 parser.add_argument("--learn_rate_dyn",
                     type=float,
                     default=1e-2,
                     help="Learning rate for optimizing dynamics model.")
-
-parser.add_argument("--num_ind_dyn",
-                    type=int,
-                    default=None,
-                    help="Number of inducing points for dynamics model. "
-                         "Determined automatically if set to None.")
 
 parser.add_argument("--num_steps_rew",
                     type=int,
@@ -199,15 +196,9 @@ parser.add_argument("--learn_rate_rew",
                     default=1e-2,
                     help="Learning rate for optimizing rewards model.")
 
-parser.add_argument("--num_ind_rew",
-                    type=int,
-                    default=None,
-                    help="Number of inducing points for rewards model. "
-                         "Determined automatically if set to None.")
-
 parser.add_argument("--num_rollouts",
                     type=int,
-                    default=300,
+                    default=500,
                     help="Number of rollouts to simulate.")
 
 parser.add_argument("--num_features",
@@ -222,8 +213,13 @@ parser.add_argument("--num_steps_policy",
 
 parser.add_argument("--learn_rate_policy",
                     type=float,
-                    default=1e-1,
+                    default=1e-2,
                     help="Learning rate for optimizing policy.")
+
+parser.add_argument("--max_ind",
+                    type=int,
+                    default=None,
+                    help="Maximum number of inducing points.")
 
 # =============================================================================
 # Setup
@@ -278,7 +274,7 @@ dyn_vfe_gps = [VFEGP(mean=dyn_means[i],
                      log_noise=args.dyn_log_noise,
                      trainable_noise=args.dyn_trainable_noise,
                      dtype=dtype,
-                     x_ind=tf.zeros((1, S + A), dtype=dtype),
+                     x_ind=tf.random.uniform(shape=(1, S + A), dtype=dtype),
                      num_ind=None)
                for i in range(S)]
 
@@ -301,10 +297,10 @@ rewards_model = VFEGP(mean=rew_mean,
                       log_noise=args.rew_log_noise,
                       trainable_noise=args.rew_trainable_noise,
                       dtype=dtype,
-                      x_ind=tf.zeros((1, S), dtype=dtype),
+                      x_ind=tf.random.uniform(shape=(1, S), dtype=dtype),
                       num_ind=None)
 
-policy = FCNPolicy(hidden_sizes=[args.hidden_size] * 2,
+policy = FCNPolicy(hidden_sizes=[args.hidden_size],
                    state_space=env.state_space,
                    action_space=env.action_space,
                    trainable=args.trainable_policy,
@@ -322,17 +318,11 @@ initial_distribution = IndependentGaussianMAPMean(state_space=env.state_space,
                                                   trainable=True,
                                                   dtype=dtype)
 
-# TODO: choose number of inducing points dynamically
-num_ind_dyn = args.num_ind_dyn or 50
-num_ind_rew = args.num_ind_rew or 50
-
 update_params = {
     "num_steps_dyn": args.num_steps_dyn,
     "learn_rate_dyn": args.learn_rate_dyn,
-    "num_ind_dyn": num_ind_dyn,
     "num_steps_rew": args.num_steps_rew,
     "learn_rate_rew": args.learn_rate_rew,
-    "num_ind_rew": num_ind_rew,
     "num_rollouts": args.num_rollouts,
     "num_features": args.num_features,
     "num_steps_policy": args.num_steps_policy,
@@ -350,6 +340,7 @@ if args.agent == "GPPSRL":
                         rewards_model=rewards_model,
                         policy=policy,
                         update_params=update_params,
+                        max_ind=args.max_ind,
                         dtype=dtype)
 
 elif args.agent == "Random":

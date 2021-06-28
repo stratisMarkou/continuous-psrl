@@ -105,7 +105,13 @@ class VFEGPStack(tf.keras.Model):
     
     def free_energy(self) -> tf.Tensor:
         return tf.reduce_sum([vfe_gp.free_energy() for vfe_gp in self.vfe_gps])
-    
+
+    def parameter_summary(self) -> str:
+
+        # Get summaries of individual GPs, join and return
+        summaries = [vfe_gp.parameter_summary() for vfe_gp in self.vfe_gps]
+
+        return "\n".join(summaries)
 
 # ==============================================================================
 # Variational Sparse Gaussian Process
@@ -159,7 +165,8 @@ class VFEGP(tf.keras.Model):
         # Set training data and inducing point initialisation
         self.x_train = tf.zeros(shape=(0, input_dim), dtype=dtype)
         self.y_train = tf.zeros(shape=(0, 1), dtype=dtype)
-        
+
+        # Add observed data
         self.add_training_data(x_train, y_train)
         
         # Initialise inducing points
@@ -192,9 +199,15 @@ class VFEGP(tf.keras.Model):
         :return:
         """
 
-        assert ((x_ind is not None) and (num_ind is None)) or \
-               ((x_ind is None) and (num_ind is not None))
+        if (x_ind is None) and (num_ind is None):
+            raise ModelError("Attempted to initialise inducing points, "
+                             "with both x_ind and num_ind set to None.")
 
+        if (x_ind is not None) and (num_ind is not None):
+            raise ModelError("Attempted to initialise inducing points, "
+                             "with both x_ind and num_ind not None.")
+
+        # Here, exactly onf of (x_ind, num_ind) is not None. Handling two cases.
         # Set inducing points either to initial locations or on training data
         if x_ind is not None:
 
@@ -214,7 +227,7 @@ class VFEGP(tf.keras.Model):
                                        replace=False)
             x_ind = tf.convert_to_tensor(self.x_train.numpy()[ind_idx],
                                          dtype=self.dtype)
-            
+
         return x_ind
 
     def add_training_data(self, x_train: tf.Tensor, y_train: tf.Tensor):
@@ -483,3 +496,18 @@ class VFEGP(tf.keras.Model):
         if self.x_train.shape[0] == 0:
             raise ModelError("Attempted evaluating a posterior quantity while "
                              "the model has no training data stored.")
+
+    def parameter_summary(self) -> str:
+
+        mean_summary = self.mean.parameter_summary()
+        mean_summary = "\t\t".join(mean_summary.split("\t"))
+
+        cov_summary = self.cov.parameter_summary()
+        cov_summary = "\t\t".join(cov_summary.split("\t"))
+
+        summary = f"GP model\n" \
+                  f"\tNoise: {self.noise}\n" \
+                  f"\t{mean_summary}\n" \
+                  f"\t{cov_summary}"
+
+        return summary

@@ -1,4 +1,4 @@
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from typing import List, Callable
 
 from cpsrl.helpers import check_shape, VariableOrTensor
@@ -11,7 +11,7 @@ import tensorflow as tf
 # Base covariance class
 # ==============================================================================
 
-class Covariance(tf.keras.Model):
+class Covariance(ABC, tf.keras.Model):
 
     def __init__(self, dtype: tf.DType, name: str = 'eq', **kwargs):
 
@@ -27,6 +27,10 @@ class Covariance(tf.keras.Model):
 
     @abstractmethod
     def sample_rff(self, num_features: int) -> Callable:
+        pass
+
+    @abstractmethod
+    def parameter_summary(self) -> str:
         pass
 
 
@@ -125,3 +129,8 @@ class EQ(Covariance):
             return tf.einsum('f, fn -> n', weights, features)
 
         return rff
+
+    def parameter_summary(self) -> str:
+        return f"EQ covariance\n" \
+               f"\tLengthscales: {self.scales.numpy()}\n" \
+               f"\tScaling coefficient: {self.coeff.numpy()}\n"
