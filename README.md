@@ -3,6 +3,7 @@
 ## Infrastructure notes
 
 Things we would like to add to the codebase:
+* Reset model parameters before each optimisation cycle
 * Unit tests for initial distribution
 * Ensure prior initial distribution is sensible
 * Add LBFGS optimisation
@@ -18,8 +19,6 @@ Things we would like to add to the codebase:
 Modifications, sanity checks and fixes to get the basic agent working:
 * Ensure models and policy train properly:
   - Train GP models via LBFGS
-  - Check the noise level learnt by the models (if this is too high, it could make optimisation very difficult)
-  - Track model free energy for convergence
   - Use more rollouts for optimising the policy
   - Track policy optimisation for convergence
   - Try near-zero initial state variance

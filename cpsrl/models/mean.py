@@ -23,6 +23,10 @@ class Mean(ABC, tf.keras.Model):
     def parameter_summary(self) -> str:
         pass
 
+    @abstractmethod
+    def reset(self):
+        pass
+
 # ==============================================================================
 # Constant mean class
 # ==============================================================================
@@ -51,6 +55,9 @@ class ConstantMean(Mean):
     def parameter_summary(self) -> str:
         return f"Constant mean \n" \
                f"\t constant: {self.constant.numpy()}"
+
+    def reset(self):
+        self.constant.assign(tf.constant(0., dtype=self.dtype))
 
 # ==============================================================================
 # Linear mean class
@@ -85,5 +92,11 @@ class LinearMean(Mean):
 
     def parameter_summary(self) -> str:
         return f"Linear mean\n" \
-               f"\tconstant: {self.constant.numpy()}\n" \
-               f"\tcoefficients: {self.coefficients.numpy()[:, 0]}"
+               f"\tConstant: {self.constant.numpy()}\n" \
+               f"\tCoefficients: {self.coefficients.numpy()[:, 0]}"
+
+    def reset(self):
+        self.coefficients.assign(tf.zeros_like(self.coefficients,
+                                               dtype=self.dtype))
+        self.constant.assign(tf.constant(0., dtype=self.dtype))
+

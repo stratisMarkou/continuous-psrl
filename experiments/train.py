@@ -170,11 +170,6 @@ parser.add_argument("--hidden_size",
                     default=64,
                     help="Hidden size for policy network.")
 
-parser.add_argument("--trainable_policy",
-                    dest="trainable_policy",
-                    action="store_true",
-                    help="Optimize policy.")
-
 # Update/optimization parameters
 parser.add_argument("--num_steps_dyn",
                     type=int,
@@ -213,7 +208,7 @@ parser.add_argument("--num_steps_policy",
 
 parser.add_argument("--learn_rate_policy",
                     type=float,
-                    default=1e-2,
+                    default=1e-3,
                     help="Learning rate for optimizing policy.")
 
 parser.add_argument("--max_ind",
@@ -300,10 +295,10 @@ rewards_model = VFEGP(mean=rew_mean,
                       x_ind=tf.random.uniform(shape=(1, S), dtype=dtype),
                       num_ind=None)
 
-policy = FCNPolicy(hidden_sizes=[args.hidden_size],
+policy = FCNPolicy(hidden_sizes=[args.hidden_size] * 2,
                    state_space=env.state_space,
                    action_space=env.action_space,
-                   trainable=args.trainable_policy,
+                   trainable=True,
                    dtype=dtype)
 
 # 3. Initial distribution

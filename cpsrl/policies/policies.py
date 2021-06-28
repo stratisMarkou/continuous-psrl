@@ -90,8 +90,14 @@ class FCNPolicy(Policy, tf.keras.Model):
         # Specify whether policy is trainable
         self.trainable = trainable
 
-        # Reset policy weights
-        self.reset()
+        # Create weight and bias tensors
+        self.W = [tf.random.normal(shape=(s1, s2), dtype=self.dtype) / s1 ** 0.5
+                  for s1, s2, in self.sizes]
+        self.W = [tf.Variable(W, trainable=self.trainable) for W in self.W]
+
+        self.b = [tf.zeros(shape=(1, s2), dtype=self.dtype)
+                  for s1, s2, in self.sizes]
+        self.b = [tf.Variable(b, trainable=self.trainable) for b in self.b]
 
         # Tensors for scaling the final action, outputed by the policy
         self.action_ranges = [a2 - a1 for a1, a2 in self.action_space]
@@ -101,17 +107,6 @@ class FCNPolicy(Policy, tf.keras.Model):
         self.action_centers = [0.5 * (a1 + a2) for a1, a2 in self.action_space]
         self.action_centers = tf.convert_to_tensor(self.action_centers)
         self.action_centers = tf.cast(self.action_centers, dtype=dtype)
-
-    def reset(self):
-
-        # Create weight and bias tensors
-        self.W = [tf.random.normal(shape=(s1, s2), dtype=self.dtype) / s1 ** 0.5
-                  for s1, s2, in self.sizes]
-        self.W = [tf.Variable(W, trainable=self.trainable) for W in self.W]
-
-        self.b = [tf.zeros(shape=(1, s2), dtype=self.dtype)
-                  for s1, s2, in self.sizes]
-        self.b = [tf.Variable(b, trainable=self.trainable) for b in self.b]
 
     def __call__(self, tensor: tf.Tensor) -> tf.Tensor:
 
