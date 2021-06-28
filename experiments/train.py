@@ -334,6 +334,9 @@ else:
 # Training loop
 # =============================================================================
 
+plot_dir = os.path.join(args.results_dir, exp_name)
+os.makedirs(plot_dir, exist_ok=True)
+
 # For each episode
 for i in range(args.num_episodes):
     # Play episode
@@ -355,10 +358,12 @@ for i in range(args.num_episodes):
                         num_episodes=10,
                         on_policy=on_policy)
 
-    cumulative_reward = cumulative_reward
     print()
     print(f'Episode {i} | Return: {cumulative_reward:.3f}')
     print()
+
+    plot_file = f"{exp_name}_{i}.jpg"
+    env.plot_trajectories([episode], save_dir=os.path.join(plot_dir, plot_file))
 
     # Save episode
     with open(os.path.join(args.data_dir, exp_name + f"_ep-{i}.pkl"), mode="wb") as f:
