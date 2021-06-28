@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 from cpsrl.agents import Agent
-from cpsrl.train_utils import play_episodes
+from cpsrl.train_utils import play_episode
 from cpsrl.helpers import check_shape, Transition
 
 
@@ -73,14 +73,14 @@ class Environment(ABC):
 
     def plot(self,
              agent: Agent,
-             num_trajectories: Optional[int] = None,
-             init_states: Optional[List[np.ndarray]] = None,
+             num_episodes: int,
              **plot_kwargs):
 
-        trajectories = play_episodes(agent=agent,
-                                     environment=self,
-                                     num_episodes=num_trajectories,
-                                     init_states=init_states)
+        trajectories = []
+        for _ in range(num_episodes):
+            _, trajectory = play_episode(agent=agent, environment=self)
+            trajectories.append(trajectory)
+
         self.plot_trajectories(trajectories, **plot_kwargs)
 
     @abstractmethod

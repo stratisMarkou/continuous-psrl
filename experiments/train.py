@@ -330,8 +330,6 @@ elif args.agent == "Random":
 else:
     raise ValueError(f"Invalid agent: {args.agent}")
 
-eval_agent = RandomAgent(action_space=env.action_space, rng=next(rng_seq))
-
 # =============================================================================
 # Training loop
 # =============================================================================
@@ -348,13 +346,14 @@ for i in range(args.num_episodes):
     agent.update()
 
     if isinstance(agent, GPPSRLAgent):
-        eval_models(dynamics_model=agent.dynamics_model,
-                    rewards_model=agent.rewards_model,
-                    agent=eval_agent,
-                    environment=env,
-                    num_features=args.num_features,
-                    dtype=dtype,
-                    num_trajectories=10)
+        print()
+        for on_policy in [True, False]:
+            print(f"Evaluating models... (on_policy={on_policy})")
+            eval_models(agent=agent,
+                        environment=env,
+                        dtype=dtype,
+                        num_episodes=10,
+                        on_policy=on_policy)
 
     cumulative_reward = cumulative_reward
     print()
