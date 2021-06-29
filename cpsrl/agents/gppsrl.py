@@ -62,11 +62,13 @@ class GPPSRLAgent(Agent):
     def act(self, state: ArrayOrTensor) -> tf.Tensor:
 
         state = tf.convert_to_tensor(state, dtype=self.dtype)
+
         if state.ndim == 1:
             state = tf.expand_dims(state, axis=0)
 
         action = self.policy(state)
         action = tf.squeeze(action, axis=0)
+
         return action
 
     def observe(self, episode: List[Transition]):
@@ -110,6 +112,7 @@ class GPPSRLAgent(Agent):
 
         print("Updating dynamics model...")
         self.dynamics_model.reset_inducing(num_ind=num_ind)
+        self.dynamics_model.reset_parameters()
         self.train_model(self.dynamics_model,
                          num_steps=self.update_params["num_steps_dyn"],
                          learn_rate=self.update_params["learn_rate_dyn"])
@@ -117,6 +120,7 @@ class GPPSRLAgent(Agent):
 
         print("\nUpdating rewards model...")
         self.rewards_model.reset_inducing(num_ind=num_ind)
+        self.rewards_model.reset_parameters()
         self.train_model(self.rewards_model,
                          num_steps=self.update_params["num_steps_rew"],
                          learn_rate=self.update_params["learn_rate_rew"])

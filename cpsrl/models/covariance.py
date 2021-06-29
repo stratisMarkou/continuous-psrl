@@ -30,6 +30,10 @@ class Covariance(ABC, tf.keras.Model):
         pass
 
     @abstractmethod
+    def reset_parameters(self):
+        pass
+
+    @abstractmethod
     def parameter_summary(self) -> str:
         pass
 
@@ -60,7 +64,11 @@ class EQ(Covariance):
         
         # Set input dimensionality
         self.input_dim = log_scales.shape[0]
-        
+
+        # Store initial_parameters for resetting
+        self._log_coeff = log_coeff
+        self._log_scales = log_scales
+
         # Set EQ coefficient and lengthscales
         self.log_coeff = tf.Variable(log_coeff, trainable=trainable)
         self.log_scales = tf.Variable(log_scales, trainable=trainable)
@@ -129,6 +137,10 @@ class EQ(Covariance):
             return tf.einsum('f, fn -> n', weights, features)
 
         return rff
+
+    def reset_parameters(self):
+        self.log_coeff.assign(self._log_coeff)
+        self.log_scales.assign(self._log_scales)
 
     def parameter_summary(self) -> str:
         return f"EQ covariance\n" \

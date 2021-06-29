@@ -357,7 +357,6 @@ for i in range(args.num_episodes):
     # Play episode
     cumulative_reward, episode = play_episode(agent=agent, environment=env)
 
-    cumulative_reward = cumulative_reward.item()
     print(f'\nEpisode {i} | Return: {cumulative_reward:.3f}\n')
 
     # Observe episode

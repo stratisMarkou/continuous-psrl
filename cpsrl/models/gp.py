@@ -123,6 +123,11 @@ class VFEGPStack(tf.keras.Model):
     def free_energy(self) -> tf.Tensor:
         return tf.reduce_sum([vfe_gp.free_energy() for vfe_gp in self.vfe_gps])
 
+    def reset_parameters(self):
+
+        for vfe_gp in self.vfe_gps:
+            vfe_gp.reset_parameters()
+
     def parameter_summary(self) -> str:
 
         # Get summaries of individual GPs, join and return
@@ -193,10 +198,12 @@ class VFEGP(tf.keras.Model):
         # Set mean and covariance functions
         self.mean = mean
         self.cov = cov
+
+        # Store log noise parameter for resetting
+        self._log_noise = tf.convert_to_tensor(log_noise, dtype=dtype)
     
         # Set log of noise parameter
-        self.log_noise = tf.convert_to_tensor(log_noise, dtype=dtype)
-        self.log_noise = tf.Variable(self.log_noise, trainable=trainable_noise)
+        self.log_noise = tf.Variable(self._log_noise, trainable=trainable_noise)
         
     def reset_inducing(self,
                        x_ind: tf.Tensor = None,
@@ -328,7 +335,6 @@ class VFEGP(tf.keras.Model):
                                           lower=False)
 
         mean = (K_pred_ind / self.noise ** 2 @ beta)
-        print('mean.shape, prior_train.shape', mean.shape, prior_train.shape)
         mean = mean + prior_pred
 
         # Compute posterior covariance
@@ -342,21 +348,40 @@ class VFEGP(tf.keras.Model):
         return mean, cov
 
     def pred_logprob(self, x_pred: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
-        y_pred = tf.squeeze(y_pred, axis=1)
+
+        # Compute predictive posterior
         mean, cov = self.post_pred(x_pred)
+
+        # Squeeze data and predictive mean
+        y_pred = tf.squeeze(y_pred, axis=1)
+        mean = tf.squeeze(mean, axis=1)
+
+        # Compute predictive standard deviations
         scale_diag = tf.sqrt(tf.linalg.diag_part(cov))
 
+        # Check shapes of data and predictive distribution are compatible
         check_shape([mean, y_pred, scale_diag], [('N',), ('N',), ('N',)])
+
         dist = tfp.distributions.MultivariateNormalDiag(loc=mean,
                                                         scale_diag=scale_diag)
 
         return dist.log_prob(y_pred)
 
     def smse(self, x_pred: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
-        y_pred = tf.squeeze(y_pred, axis=1)
+
+        # Compute predictive posterior
         mean, cov = self.post_pred(x_pred)
+
+        # Squeeze data and predictive mean
+        y_pred = tf.squeeze(y_pred, axis=1)
+        mean = tf.squeeze(mean, axis=1)
+
+        # Compute predictive standard deviations
         scale_diag = tf.sqrt(tf.linalg.diag_part(cov))
+
+        # Check shapes of data and predictive distribution are compatible
         check_shape([mean, y_pred, scale_diag], [('N',), ('N',), ('N',)])
+
         return tf.reduce_mean(tf.abs(y_pred - mean) / scale_diag)
 
     def free_energy(self) -> tf.Tensor:
@@ -531,6 +556,15 @@ class VFEGP(tf.keras.Model):
         if self.x_train.shape[0] == 0:
             raise ModelError("Attempted evaluating a posterior quantity while "
                              "the model has no training data stored.")
+
+    def reset_parameters(self):
+
+        # Reset mean and covariance parameters
+        self.mean.reset_parameters()
+        self.cov.reset_parameters()
+
+        # Reset log noise parameter
+        self.log_noise.assign(self._log_noise)
 
     def parameter_summary(self) -> str:
 
