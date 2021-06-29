@@ -73,23 +73,12 @@ class Environment(ABC):
 
     def plot(self,
              agent: Agent,
-             num_trajectories: Optional[int] = None,
-             init_states: Optional[List[np.ndarray]] = None,
+             num_episodes: int,
              **plot_kwargs):
 
-        if ((num_trajectories is None and init_states is None)
-                or (num_trajectories is not None and init_states is not None)):
-            raise ValueError("One of {num_trajectories, init_states}"
-                             " should not be None.")
-
-        if num_trajectories is not None:
-            init_states = [self.reset() for _ in range(num_trajectories)]
-
         trajectories = []
-        for init_state in init_states:
-            _, trajectory = play_episode(agent=agent,
-                                         environment=self,
-                                         init_state=init_state)
+        for _ in range(num_episodes):
+            _, trajectory = play_episode(agent=agent, environment=self)
             trajectories.append(trajectory)
 
         self.plot_trajectories(trajectories, **plot_kwargs)

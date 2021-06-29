@@ -1,6 +1,7 @@
-from typing import Tuple, List, Callable, Optional, Union
+from typing import Tuple, List, Callable, Optional
 
 import tensorflow as tf
+import tensorflow_probability as tfp
 import numpy as np
 
 from cpsrl.models.mean import Mean
@@ -102,6 +103,22 @@ class VFEGPStack(tf.keras.Model):
             return tf.concat(samples, axis=1)
             
         return post_sample
+
+    def pred_logprob(self, x_pred: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
+        log_probs = []
+        for i, vfe_gp in enumerate(self.vfe_gps):
+            log_prob = vfe_gp.pred_logprob(x_pred, y_pred[:, i:i+1])
+            log_probs.append(log_prob)
+
+        return tf.stack(log_probs)
+
+    def smse(self, x_pred: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
+        smses = []
+        for i, vfe_gp in enumerate(self.vfe_gps):
+            smse = vfe_gp.smse(x_pred, y_pred[:, i:i+1])
+            smses.append(smse)
+
+        return tf.stack(smses)
     
     def free_energy(self) -> tf.Tensor:
         return tf.reduce_sum([vfe_gp.free_energy() for vfe_gp in self.vfe_gps])
@@ -323,7 +340,25 @@ class VFEGP(tf.keras.Model):
         cov = cov + tf.matmul(D, D, transpose_a=True)
         
         return mean, cov
-        
+
+    def pred_logprob(self, x_pred: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
+        y_pred = tf.squeeze(y_pred, axis=1)
+        mean, cov = self.post_pred(x_pred)
+        scale_diag = tf.sqrt(tf.linalg.diag_part(cov))
+
+        check_shape([mean, y_pred, scale_diag], [('N',), ('N',), ('N',)])
+        dist = tfp.distributions.MultivariateNormalDiag(loc=mean,
+                                                        scale_diag=scale_diag)
+
+        return dist.log_prob(y_pred)
+
+    def smse(self, x_pred: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
+        y_pred = tf.squeeze(y_pred, axis=1)
+        mean, cov = self.post_pred(x_pred)
+        scale_diag = tf.sqrt(tf.linalg.diag_part(cov))
+        check_shape([mean, y_pred, scale_diag], [('N',), ('N',), ('N',)])
+        return tf.reduce_mean(tf.abs(y_pred - mean) / scale_diag)
+
     def free_energy(self) -> tf.Tensor:
         """
         Computes the Variational Free Energy in a numerically stable way.
@@ -375,7 +410,7 @@ class VFEGP(tf.keras.Model):
         trace = trace + 0.5 * tf.linalg.trace(tf.matmul(A, A, transpose_b=True))
 
         free_energy = (log_det + quad + trace) / N
-
+        
         return free_energy
         
     def sample_posterior(self, num_features: int) -> Callable:

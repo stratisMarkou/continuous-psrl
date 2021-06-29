@@ -13,7 +13,7 @@ from cpsrl.models.gp import VFEGP, VFEGPStack
 from cpsrl.models.initial_distributions import IndependentGaussianMAPMean
 from cpsrl.policies.policies import FCNPolicy
 from cpsrl.environments import MountainCar, CartPole
-from cpsrl.train_utils import play_episode
+from cpsrl.train_utils import play_episode, eval_models
 from cpsrl.helpers import set_seed, Logger
 
 parser = argparse.ArgumentParser()
@@ -348,6 +348,9 @@ else:
 # Training loop
 # =============================================================================
 
+plot_dir = os.path.join(args.results_dir, exp_name)
+os.makedirs(plot_dir, exist_ok=True)
+
 # For each episode
 for i in range(args.num_episodes):
 
@@ -362,6 +365,22 @@ for i in range(args.num_episodes):
 
     # Train agent models and/or policy
     agent.update()
+
+    if isinstance(agent, GPPSRLAgent):
+        for on_policy in [True, False]:
+
+            print(f"Evaluating models... (on_policy={on_policy})")
+
+            eval_models(agent=agent,
+                        environment=env,
+                        dtype=dtype,
+                        num_episodes=10,
+                        on_policy=on_policy)
+
+    print(f"\nEpisode {i} | Return: {cumulative_reward:.3f}\n")
+
+    plot_file = f"{exp_name}_{i}.jpg"
+    env.plot_trajectories([episode], save_dir=os.path.join(plot_dir, plot_file))
 
     # Save episode
     with open(os.path.join(args.data_dir, f"{exp_name}_ep-{i}.pkl"),
