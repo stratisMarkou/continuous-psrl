@@ -183,7 +183,7 @@ class GPPSRLAgent(Agent):
         # Draw dynamics and rewards samples
         dyn_sample = self.dynamics_model.sample_posterior(num_features)
         rew_sample = self.rewards_model.sample_posterior(num_features)
-        initial_distribution = self.initial_distribution.posterior_sample()
+        initial_distribution = self.initial_distribution.sample_posterior()
 
         # Initialise optimiser
         optimizer = tf.optimizers.Adam(learn_rate)

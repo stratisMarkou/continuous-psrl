@@ -35,7 +35,7 @@ class InitialStateDistribution(ABC):
         pass
 
     @abstractmethod
-    def posterior_sample(self) -> tfd.Distribution:
+    def sample_posterior(self) -> tfd.Distribution:
         pass
 
     def add_training_data(self, init_states: tf.Tensor):
@@ -129,7 +129,7 @@ class IndependentGaussian(InitialStateDistribution):
         self.beta = self.beta0 + 0.5 * N * x_var + \
                     0.5 * N * self.kappa0 * diff ** 2 / (self.kappa0 + N)
 
-    def posterior_sample(self) -> tfd.Distribution:
+    def sample_posterior(self) -> tfd.Distribution:
         """
         Samples an initial distribution from the posterior over initial
         distributions, returning the result as a tfd.Distribution, which can
@@ -189,7 +189,7 @@ class IndependentGaussianMAPMean(IndependentGaussian):
                          trainable=trainable,
                          dtype=dtype)
 
-    def posterior_sample(self) -> tfd.Distribution:
+    def sample_posterior(self) -> tfd.Distribution:
         """
         Samples an initial distribution from the posterior over initial
         distributions, returning the result as a tfd.Distribution, which can
