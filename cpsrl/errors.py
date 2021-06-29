@@ -9,3 +9,6 @@ class ModelError(Exception):
 
 class ShapeError(Exception):
     pass
+
+class InitialDistributionError(Exception):
+    pass
