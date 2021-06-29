@@ -376,8 +376,6 @@ for i in range(args.num_episodes):
                         num_episodes=10,
                         on_policy=on_policy)
 
-    print(f"\nEpisode {i} | Return: {cumulative_reward:.3f}\n")
-
     plot_file = f"{exp_name}_{i}.jpg"
     env.plot_trajectories([episode], save_dir=os.path.join(plot_dir, plot_file))
 
