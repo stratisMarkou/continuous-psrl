@@ -13,7 +13,7 @@ from cpsrl.models.gp import VFEGP, VFEGPStack
 from cpsrl.models.initial_distributions import IndependentGaussian
 from cpsrl.policies.policies import FCNPolicy
 from cpsrl.environments import MountainCar, CartPole
-from cpsrl.train_utils import play_episode
+from cpsrl.train_utils import play_episode, eval_models
 from cpsrl.helpers import set_seed, Logger
 
 parser = argparse.ArgumentParser()
@@ -334,6 +334,9 @@ else:
 # Training loop
 # =============================================================================
 
+plot_dir = os.path.join(args.results_dir, exp_name)
+os.makedirs(plot_dir, exist_ok=True)
+
 # For each episode
 for i in range(args.num_episodes):
     # Play episode
@@ -345,10 +348,22 @@ for i in range(args.num_episodes):
     # Train agent models and/or policy
     agent.update()
 
-    cumulative_reward = cumulative_reward.item()
+    if isinstance(agent, GPPSRLAgent):
+        print()
+        for on_policy in [True, False]:
+            print(f"Evaluating models... (on_policy={on_policy})")
+            eval_models(agent=agent,
+                        environment=env,
+                        dtype=dtype,
+                        num_episodes=10,
+                        on_policy=on_policy)
+
     print()
     print(f'Episode {i} | Return: {cumulative_reward:.3f}')
     print()
+
+    plot_file = f"{exp_name}_{i}.jpg"
+    env.plot_trajectories([episode], save_dir=os.path.join(plot_dir, plot_file))
 
     # Save episode
     with open(os.path.join(args.data_dir, exp_name + f"_ep-{i}.pkl"), mode="wb") as f:
