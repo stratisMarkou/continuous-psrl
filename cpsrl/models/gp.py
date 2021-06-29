@@ -105,18 +105,18 @@ class VFEGPStack(tf.keras.Model):
         return post_sample
 
     def pred_logprob(self, x_pred: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
-        log_probs = []
-        for i, vfe_gp in enumerate(self.vfe_gps):
-            log_prob = vfe_gp.pred_logprob(x_pred, y_pred[:, i:i+1])
-            log_probs.append(log_prob)
+
+        # Compute predictive log-probabilities for each GP and stack
+        log_probs = [vfe_gp.pred_logprob(x_pred, y_pred[:, i:i+1])
+                     for i, vfe_gp in enumerate(self.vfe_gps)]
 
         return tf.stack(log_probs)
 
     def smse(self, x_pred: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
-        smses = []
-        for i, vfe_gp in enumerate(self.vfe_gps):
-            smse = vfe_gp.smse(x_pred, y_pred[:, i:i+1])
-            smses.append(smse)
+
+        # Compute SMSE for each GP and stack
+        smses = [vfe_gp.smse(x_pred, y_pred[:, i:i+1])
+                     for i, vfe_gp in enumerate(self.vfe_gps)]
 
         return tf.stack(smses)
     
