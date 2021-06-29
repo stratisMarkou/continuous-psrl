@@ -156,12 +156,12 @@ parser.add_argument("--init_mu0",
 
 parser.add_argument("--init_alpha0",
                     type=float,
-                    default=1000.0,
+                    default=100.0,
                     help="Mean for initial distribution.")
 
 parser.add_argument("--init_beta0",
                     type=float,
-                    default=0.01,
+                    default=0.1,
                     help="Mean for initial distribution.")
 
 # Policy parameters
@@ -193,7 +193,7 @@ parser.add_argument("--learn_rate_rew",
 
 parser.add_argument("--num_rollouts",
                     type=int,
-                    default=500,
+                    default=200,
                     help="Number of rollouts to simulate.")
 
 parser.add_argument("--num_features",

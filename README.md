@@ -3,13 +3,11 @@
 ## Infrastructure notes
 
 Things we would like to add to the codebase:
-* Reset model parameters before each optimisation cycle
 * Unit tests for initial distribution
 * Ensure prior initial distribution is sensible
 * Add LBFGS optimisation
 * Add interfacing to environment's dynamics and rewards as models for ground truth training/testing
 * Add rng to various classes: models, agents, policy
-* Functionality for evaluating models on randomly sampled ground truth data (performance measures)
 * Add oracle agent for low-dimensional environments
 * Agent snapshot saving and loading
 * Consider adding stateful optimiser
@@ -19,9 +17,6 @@ Things we would like to add to the codebase:
 Modifications, sanity checks and fixes to get the basic agent working:
 * Ensure models and policy train properly:
   - Train GP models via LBFGS
-  - Use more rollouts for optimising the policy
-  - Track policy optimisation for convergence
-  - Try near-zero initial state variance
   - Give lots of data to the models, try to optimise policy
 
 ## General ideas

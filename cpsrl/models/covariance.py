@@ -143,6 +143,9 @@ class EQ(Covariance):
         self.log_scales.assign(self._log_scales)
 
     def parameter_summary(self) -> str:
-        return f"EQ covariance\n" \
+
+        flag = "(*)" if self.trainable else ""
+
+        return f"EQ covariance {flag}\n" \
                f"\tLengthscales: {self.scales.numpy()}\n" \
                f"\tScaling coefficient: {self.coeff.numpy()}\n"

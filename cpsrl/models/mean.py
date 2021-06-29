@@ -43,6 +43,8 @@ class ConstantMean(Mean):
         super().__init__(name=name, dtype=dtype)
 
         self.input_dim = input_dim
+        self.trainable = trainable
+
         self.constant = tf.Variable(tf.constant(0., dtype=dtype),
                                     trainable=trainable)
         
@@ -53,7 +55,10 @@ class ConstantMean(Mean):
         return self.constant * tf.ones((x.shape[0], 1), dtype=self.dtype)
 
     def parameter_summary(self) -> str:
-        return f"Constant mean \n" \
+
+        flag = "(*)" if self.trainable else ""
+
+        return f"Constant mean {flag}\n" \
                f"\t constant: {self.constant.numpy()}"
 
     def reset_parameters(self):
@@ -75,6 +80,7 @@ class LinearMean(Mean):
         super().__init__(name=name, dtype=dtype)
 
         self.input_dim = input_dim
+        self.trainable = trainable
 
         self.coefficients = tf.Variable(tf.zeros(shape=(input_dim, 1),
                                                  dtype=dtype),
@@ -91,7 +97,10 @@ class LinearMean(Mean):
         return x @ self.coefficients + self.constant
 
     def parameter_summary(self) -> str:
-        return f"Linear mean\n" \
+
+        flag = "(*)" if self.trainable else ""
+
+        return f"Linear mean {flag}\n" \
                f"\tConstant: {self.constant.numpy()}\n" \
                f"\tCoefficients: {self.coefficients.numpy()[:, 0]}"
 

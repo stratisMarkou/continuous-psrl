@@ -73,9 +73,6 @@ class GPPSRLAgent(Agent):
 
     def observe(self, episode: List[Transition]):
 
-        # Increment number of observations
-        self.num_observations = self.num_observations + len(episode)
-
         # Convert episode to tensors, to update the models' training data
         s, sa, s_, sas_, r = convert_episode_to_tensors(episode,
                                                         dtype=self.dtype)
@@ -88,6 +85,9 @@ class GPPSRLAgent(Agent):
         self.initial_distribution.add_training_data(s0)
         self.dynamics_model.add_training_data(sa, ds)
         self.rewards_model.add_training_data(s, r)
+
+        # Increment number of observations
+        self.num_observations = self.num_observations + s.shape[0]
 
     def update(self):
         """
@@ -137,6 +137,7 @@ class GPPSRLAgent(Agent):
                     model: Union[VFEGP, VFEGPStack],
                     num_steps: int,
                     learn_rate: float) -> float:
+
 
         if not model.trainable_variables:
             warnings.warn("Attempted to train model with no trainable "
@@ -190,7 +191,7 @@ class GPPSRLAgent(Agent):
 
         for i in range(num_steps):
             with tf.GradientTape() as tape:
-                
+
                 # Ensure policy variables are being watched
                 tape.watch(self.policy.trainable_variables)
 
@@ -266,6 +267,7 @@ class GPPSRLAgent(Agent):
         cumulative_reward = tf.zeros(shape=(R,), dtype=self.dtype)
 
         for i in range(horizon):
+
             # Get action from the policy
             a = self.policy(s)
 
@@ -277,7 +279,7 @@ class GPPSRLAgent(Agent):
 
             # Get next state and rewards from the model samples
             ds = dynamics_sample(sa, add_noise=True)
-            
+
             # Check shapes of s and ds match
             check_shape([s, ds], [(R, S), (R, S)])
             

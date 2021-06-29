@@ -191,10 +191,10 @@ class VFEGP(tf.keras.Model):
         # Add observed data
         self.add_training_data(x_train, y_train)
         
-        # Initialise inducing points
-        self.x_ind = self.reset_inducing(x_ind, num_ind)
-        self.x_ind = tf.Variable(self.x_ind, trainable=trainable_inducing)
-        
+        # Specify whether inducing points are trainable and reset
+        self.trainable_inducing = trainable_inducing
+        self.reset_inducing(x_ind, num_ind)
+
         # Set mean and covariance functions
         self.mean = mean
         self.cov = cov
@@ -207,7 +207,7 @@ class VFEGP(tf.keras.Model):
         
     def reset_inducing(self,
                        x_ind: tf.Tensor = None,
-                       num_ind: int = None) -> tf.Tensor:
+                       num_ind: int = None):
         """
         Creates a tensor containing the initial inducing point locations.
         Assumes exactly one of *x_ind* or *num_ind* is specified,
@@ -249,10 +249,11 @@ class VFEGP(tf.keras.Model):
             ind_idx = np.random.choice(np.arange(self.x_train.shape[0]),
                                        size=(num_ind,),
                                        replace=False)
+
             x_ind = tf.convert_to_tensor(self.x_train.numpy()[ind_idx],
                                          dtype=self.dtype)
 
-        return x_ind
+        self.x_ind = tf.Variable(x_ind, trainable=self.trainable_inducing)
 
     def add_training_data(self, x_train: tf.Tensor, y_train: tf.Tensor):
         """
@@ -504,7 +505,7 @@ class VFEGP(tf.keras.Model):
 
             # Covariance between inputs and inducing points
             K_x_ind = self.cov(x, self.x_ind)
-            
+
             sample = rff_prior(x)[:, None] + K_x_ind @ v + prior_mean
 
             if add_noise:
@@ -574,9 +575,13 @@ class VFEGP(tf.keras.Model):
         cov_summary = self.cov.parameter_summary()
         cov_summary = "\t\t".join(cov_summary.split("\t"))
 
+        inducing_flag = " (*)" if self.x_ind.trainable else ""
+        noise_flag = " (*)" if self.log_noise.trainable else ""
+
         summary = f"GP model\n" \
-                  f"\tNoise: {self.noise}\n" \
+                  f"\tInducing{inducing_flag}: {self.x_ind.shape[0]}\n" \
+                  f"\tNoise{noise_flag}: {self.noise}\n" \
                   f"\t{mean_summary}\n" \
-                  f"\t{cov_summary}"
+                  f"\t{cov_summary}" \
 
         return summary
