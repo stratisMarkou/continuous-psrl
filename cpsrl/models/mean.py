@@ -1,4 +1,4 @@
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 
 import tensorflow as tf
 
@@ -9,9 +9,9 @@ from cpsrl.helpers import check_shape, VariableOrTensor
 # Base mean class
 # ==============================================================================
 
-class Mean(tf.keras.Model):
+class Mean(ABC, tf.keras.Model):
 
-    def __init__(self, dtype: tf.DType, name='mean'):
+    def __init__(self, dtype: tf.DType, name="mean"):
 
         super().__init__(name=name, dtype=dtype)
 
@@ -19,10 +19,18 @@ class Mean(tf.keras.Model):
     def __call__(self, x: VariableOrTensor) -> tf.Tensor:
         pass
 
+    @abstractmethod
+    def parameter_summary(self) -> str:
+        pass
+
+    @abstractmethod
+    def reset_parameters(self):
+        pass
 
 # ==============================================================================
 # Constant mean class
 # ==============================================================================
+
 
 class ConstantMean(Mean):
 
@@ -35,6 +43,8 @@ class ConstantMean(Mean):
         super().__init__(name=name, dtype=dtype)
 
         self.input_dim = input_dim
+        self.trainable = trainable
+
         self.constant = tf.Variable(tf.constant(0., dtype=dtype),
                                     trainable=trainable)
         
@@ -44,6 +54,15 @@ class ConstantMean(Mean):
 
         return self.constant * tf.ones((x.shape[0], 1), dtype=self.dtype)
 
+    def parameter_summary(self) -> str:
+
+        flag = "(*)" if self.trainable else ""
+
+        return f"Constant mean {flag}\n" \
+               f"\t constant: {self.constant.numpy()}"
+
+    def reset_parameters(self):
+        self.constant.assign(tf.constant(0., dtype=self.dtype))
 
 # ==============================================================================
 # Linear mean class
@@ -61,6 +80,7 @@ class LinearMean(Mean):
         super().__init__(name=name, dtype=dtype)
 
         self.input_dim = input_dim
+        self.trainable = trainable
 
         self.coefficients = tf.Variable(tf.zeros(shape=(input_dim, 1),
                                                  dtype=dtype),
@@ -75,3 +95,17 @@ class LinearMean(Mean):
         check_shape(x, (-1, self.input_dim))
 
         return x @ self.coefficients + self.constant
+
+    def parameter_summary(self) -> str:
+
+        flag = "(*)" if self.trainable else ""
+
+        return f"Linear mean {flag}\n" \
+               f"\tConstant: {self.constant.numpy()}\n" \
+               f"\tCoefficients: {self.coefficients.numpy()[:, 0]}"
+
+    def reset_parameters(self):
+        self.coefficients.assign(tf.zeros_like(self.coefficients,
+                                               dtype=self.dtype))
+        self.constant.assign(tf.constant(0., dtype=self.dtype))
+

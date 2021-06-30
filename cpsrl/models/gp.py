@@ -105,24 +105,35 @@ class VFEGPStack(tf.keras.Model):
         return post_sample
 
     def pred_logprob(self, x_pred: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
-        log_probs = []
-        for i, vfe_gp in enumerate(self.vfe_gps):
-            log_prob = vfe_gp.pred_logprob(x_pred, y_pred[:, i:i+1])
-            log_probs.append(log_prob)
+
+        # Compute predictive log-probabilities for each GP and stack
+        log_probs = [vfe_gp.pred_logprob(x_pred, y_pred[:, i:i+1])
+                     for i, vfe_gp in enumerate(self.vfe_gps)]
 
         return tf.stack(log_probs)
 
     def smse(self, x_pred: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
-        smses = []
-        for i, vfe_gp in enumerate(self.vfe_gps):
-            smse = vfe_gp.smse(x_pred, y_pred[:, i:i+1])
-            smses.append(smse)
+
+        # Compute SMSE for each GP and stack
+        smses = [vfe_gp.smse(x_pred, y_pred[:, i:i+1])
+                     for i, vfe_gp in enumerate(self.vfe_gps)]
 
         return tf.stack(smses)
     
     def free_energy(self) -> tf.Tensor:
         return tf.reduce_sum([vfe_gp.free_energy() for vfe_gp in self.vfe_gps])
-    
+
+    def reset_parameters(self):
+
+        for vfe_gp in self.vfe_gps:
+            vfe_gp.reset_parameters()
+
+    def parameter_summary(self) -> str:
+
+        # Get summaries of individual GPs, join and return
+        summaries = [vfe_gp.parameter_summary() for vfe_gp in self.vfe_gps]
+
+        return "\n".join(summaries)
 
 # ==============================================================================
 # Variational Sparse Gaussian Process
@@ -176,24 +187,27 @@ class VFEGP(tf.keras.Model):
         # Set training data and inducing point initialisation
         self.x_train = tf.zeros(shape=(0, input_dim), dtype=dtype)
         self.y_train = tf.zeros(shape=(0, 1), dtype=dtype)
-        
+
+        # Add observed data
         self.add_training_data(x_train, y_train)
         
-        # Initialise inducing points
-        self.x_ind = self.reset_inducing(x_ind, num_ind)
-        self.x_ind = tf.Variable(self.x_ind, trainable=trainable_inducing)
-        
+        # Specify whether inducing points are trainable and reset
+        self.trainable_inducing = trainable_inducing
+        self.reset_inducing(x_ind, num_ind)
+
         # Set mean and covariance functions
         self.mean = mean
         self.cov = cov
-    
+
+        # Store log noise parameter for resetting
+        self._log_noise = tf.convert_to_tensor(log_noise, dtype=dtype)
+
         # Set log of noise parameter
-        self.log_noise = tf.convert_to_tensor(log_noise, dtype=dtype)
-        self.log_noise = tf.Variable(self.log_noise, trainable=trainable_noise)
+        self.log_noise = tf.Variable(self._log_noise, trainable=trainable_noise)
         
     def reset_inducing(self,
                        x_ind: tf.Tensor = None,
-                       num_ind: int = None) -> tf.Tensor:
+                       num_ind: int = None):
         """
         Creates a tensor containing the initial inducing point locations.
         Assumes exactly one of *x_ind* or *num_ind* is specified,
@@ -209,9 +223,15 @@ class VFEGP(tf.keras.Model):
         :return:
         """
 
-        assert ((x_ind is not None) and (num_ind is None)) or \
-               ((x_ind is None) and (num_ind is not None))
+        if (x_ind is None) and (num_ind is None):
+            raise ModelError("Attempted to initialise inducing points, "
+                             "with both x_ind and num_ind set to None.")
 
+        if (x_ind is not None) and (num_ind is not None):
+            raise ModelError("Attempted to initialise inducing points, "
+                             "with both x_ind and num_ind not None.")
+
+        # Here, exactly onf of (x_ind, num_ind) is not None. Handling two cases.
         # Set inducing points either to initial locations or on training data
         if x_ind is not None:
 
@@ -229,10 +249,11 @@ class VFEGP(tf.keras.Model):
             ind_idx = np.random.choice(np.arange(self.x_train.shape[0]),
                                        size=(num_ind,),
                                        replace=False)
+
             x_ind = tf.convert_to_tensor(self.x_train.numpy()[ind_idx],
                                          dtype=self.dtype)
-            
-        return x_ind
+
+        self.x_ind = tf.Variable(x_ind, trainable=self.trainable_inducing)
 
     def add_training_data(self, x_train: tf.Tensor, y_train: tf.Tensor):
         """
@@ -315,7 +336,6 @@ class VFEGP(tf.keras.Model):
                                           lower=False)
 
         mean = (K_pred_ind / self.noise ** 2 @ beta)
-        print('mean.shape, prior_train.shape', mean.shape, prior_train.shape)
         mean = mean + prior_pred
 
         # Compute posterior covariance
@@ -329,23 +349,40 @@ class VFEGP(tf.keras.Model):
         return mean, cov
 
     def pred_logprob(self, x_pred: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
+
+        # Compute predictive posterior
         mean, cov = self.post_pred(x_pred)
+
+        # Squeeze data and predictive mean
         y_pred = tf.squeeze(y_pred, axis=1)
         mean = tf.squeeze(mean, axis=1)
+
+        # Compute predictive standard deviations
         scale_diag = tf.sqrt(tf.linalg.diag_part(cov))
 
+        # Check shapes of data and predictive distribution are compatible
         check_shape([mean, y_pred, scale_diag], [('N',), ('N',), ('N',)])
+
         dist = tfp.distributions.MultivariateNormalDiag(loc=mean,
                                                         scale_diag=scale_diag)
 
         return dist.log_prob(y_pred)
 
     def smse(self, x_pred: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
+
+        # Compute predictive posterior
         mean, cov = self.post_pred(x_pred)
+
+        # Squeeze data and predictive mean
         y_pred = tf.squeeze(y_pred, axis=1)
         mean = tf.squeeze(mean, axis=1)
+
+        # Compute predictive standard deviations
         scale_diag = tf.sqrt(tf.linalg.diag_part(cov))
+
+        # Check shapes of data and predictive distribution are compatible
         check_shape([mean, y_pred, scale_diag], [('N',), ('N',), ('N',)])
+
         return tf.reduce_mean(tf.abs(y_pred - mean) / scale_diag)
 
     def free_energy(self) -> tf.Tensor:
@@ -468,7 +505,7 @@ class VFEGP(tf.keras.Model):
 
             # Covariance between inputs and inducing points
             K_x_ind = self.cov(x, self.x_ind)
-            
+
             sample = rff_prior(x)[:, None] + K_x_ind @ v + prior_mean
 
             if add_noise:
@@ -520,3 +557,31 @@ class VFEGP(tf.keras.Model):
         if self.x_train.shape[0] == 0:
             raise ModelError("Attempted evaluating a posterior quantity while "
                              "the model has no training data stored.")
+
+    def reset_parameters(self):
+
+        # Reset mean and covariance parameters
+        self.mean.reset_parameters()
+        self.cov.reset_parameters()
+
+        # Reset log noise parameter
+        self.log_noise.assign(self._log_noise)
+
+    def parameter_summary(self) -> str:
+
+        mean_summary = self.mean.parameter_summary()
+        mean_summary = "\t\t".join(mean_summary.split("\t"))
+
+        cov_summary = self.cov.parameter_summary()
+        cov_summary = "\t\t".join(cov_summary.split("\t"))
+
+        inducing_flag = " (*)" if self.x_ind.trainable else ""
+        noise_flag = " (*)" if self.log_noise.trainable else ""
+
+        summary = f"GP model\n" \
+                  f"\tInducing{inducing_flag}: {self.x_ind.shape[0]}\n" \
+                  f"\tNoise{noise_flag}: {self.noise}\n" \
+                  f"\t{mean_summary}\n" \
+                  f"\t{cov_summary}" \
+
+        return summary
