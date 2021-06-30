@@ -4,6 +4,7 @@ import pickle
 import argparse
 import sys
 
+import numpy as np
 import tensorflow as tf
 
 from cpsrl.agents import RandomAgent, GPPSRLAgent
@@ -346,9 +347,19 @@ for i in range(args.num_episodes):
     agent.observe(episode)
 
     # Train agent models and/or policy
-    agent.update()
+    info_dict = agent.update()
 
     if isinstance(agent, GPPSRLAgent):
+        # Analyze optimization
+        rollouts = info_dict["rollout"]
+        plot_freq = np.maximum(1, len(rollouts) // 10)
+        opt_steps = np.arange(len(rollouts))
+        for t, rollout in zip(opt_steps[::plot_freq], rollouts[::plot_freq]):
+            plot_file = f"opt_ep-{i}_iter-{t}.jpg"
+            save_dir = os.path.join(plot_dir, plot_file)
+            env.plot_trajectories(rollout, save_dir=save_dir)
+
+        # Evaluate model performance
         print()
         for on_policy in [True, False]:
             print(f"Evaluating models... (on_policy={on_policy})")
@@ -362,7 +373,7 @@ for i in range(args.num_episodes):
     print(f'Episode {i} | Return: {cumulative_reward:.3f}')
     print()
 
-    plot_file = f"{exp_name}_{i}.jpg"
+    plot_file = f"exp_ep-{i}.jpg"
     env.plot_trajectories([episode], save_dir=os.path.join(plot_dir, plot_file))
 
     # Save episode

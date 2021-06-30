@@ -329,8 +329,9 @@ class VFEGP(tf.keras.Model):
         return mean, cov
 
     def pred_logprob(self, x_pred: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
-        y_pred = tf.squeeze(y_pred, axis=1)
         mean, cov = self.post_pred(x_pred)
+        y_pred = tf.squeeze(y_pred, axis=1)
+        mean = tf.squeeze(mean, axis=1)
         scale_diag = tf.sqrt(tf.linalg.diag_part(cov))
 
         check_shape([mean, y_pred, scale_diag], [('N',), ('N',), ('N',)])
@@ -340,8 +341,9 @@ class VFEGP(tf.keras.Model):
         return dist.log_prob(y_pred)
 
     def smse(self, x_pred: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
-        y_pred = tf.squeeze(y_pred, axis=1)
         mean, cov = self.post_pred(x_pred)
+        y_pred = tf.squeeze(y_pred, axis=1)
+        mean = tf.squeeze(mean, axis=1)
         scale_diag = tf.sqrt(tf.linalg.diag_part(cov))
         check_shape([mean, y_pred, scale_diag], [('N',), ('N',), ('N',)])
         return tf.reduce_mean(tf.abs(y_pred - mean) / scale_diag)
@@ -462,7 +464,7 @@ class VFEGP(tf.keras.Model):
 
             # Check input shape
             check_shape([prior_mean, self.x_train, x],
-                        [(-1, 'D'), (-1, 'D'), (-1, 'D')])
+                        [(-1, 1), (-1, 'D'), (-1, 'D')])
 
             # Covariance between inputs and inducing points
             K_x_ind = self.cov(x, self.x_ind)
