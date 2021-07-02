@@ -237,8 +237,8 @@ class GPPSRLAgent(Agent):
             gradients = tape.gradient(loss, self.policy.trainable_variables)
             optimizer.apply_gradients(zip(gradients,
                                           self.policy.trainable_variables))
-
-            return info_dict
+            
+        return info_dict
 
     def rollout(self,
                 dynamics_sample: Callable,
