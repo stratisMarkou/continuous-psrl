@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from cpsrl.environments import Environment
 from cpsrl.errors import EnvironmentError
 from cpsrl.helpers import check_shape, Transition
+from cpsrl.plot_utils import color_defaults
 
 
 # =============================================================================
@@ -97,8 +98,16 @@ class MountainCar(Environment):
 
     def plot_trajectories(self,
                           trajectories: List[List[Transition]],
-                          save_dir: Optional[str] = None):
+                          save_dir: Optional[str] = None,
+                          **plot_kwargs):
         fig = plt.figure()
+        plot_muted = len(trajectories) > len(color_defaults)  # > 10
+        if plot_muted:
+            colors = [color_defaults[0]] * len(trajectories)
+            alpha = 1 / len(trajectories)
+        else:
+            colors = color_defaults
+            alpha = 1.0
 
         # joint axis
         ax = fig.add_subplot(111)
@@ -122,14 +131,14 @@ class MountainCar(Environment):
         ax3 = fig.add_subplot(313, sharex=ax1)
         ax3.set_ylabel("Action")
 
-        for trajectory in trajectories:
+        for i, trajectory in enumerate(trajectories):
             t = np.arange(len(trajectory))
             states, actions, _, _ = Transition(*zip(*trajectory))
             states, actions = np.array(states), np.array(actions)
 
-            ax1.plot(t, states[:, 0])
-            ax2.plot(t, states[:, 1])
-            ax3.plot(t, actions)
+            ax1.plot(t, states[:, 0], c=colors[i], alpha=alpha)
+            ax2.plot(t, states[:, 1], c=colors[i], alpha=alpha)
+            ax3.plot(t, actions, c=colors[i], alpha=alpha)
 
         ax.set_xlabel('Time')
         fig.align_ylabels([ax1, ax2, ax3])

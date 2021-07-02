@@ -33,7 +33,7 @@ class Agent(ABC):
         pass
 
     @abstractmethod
-    def update(self, **kwargs):
+    def update(self, **kwargs) -> Optional[dict]:
         """
         Method called after each episode and performs the updates required by
         the agent, such as retraining the models or updating the policy.
@@ -76,5 +76,5 @@ class RandomAgent(Agent):
     def observe(self, episode: List[Transition]):
         pass
 
-    def update(self):
+    def update(self) -> Optional[dict]:
         pass

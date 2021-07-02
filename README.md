@@ -3,6 +3,7 @@
 ## Infrastructure notes
 
 Things we would like to add to the codebase:
+* __FIX ACTION BUG__
 * Unit tests for initial distribution
 * Ensure prior initial distribution is sensible
 * Add LBFGS optimisation
