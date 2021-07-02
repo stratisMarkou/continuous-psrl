@@ -74,6 +74,7 @@ class Environment(ABC):
     def plot(self,
              agent: Agent,
              num_episodes: int,
+             save_dir: str,
              **plot_kwargs):
 
         trajectories = []
@@ -81,8 +82,11 @@ class Environment(ABC):
             _, trajectory = play_episode(agent=agent, environment=self)
             trajectories.append(trajectory)
 
-        self.plot_trajectories(trajectories, **plot_kwargs)
+        self.plot_trajectories(trajectories, save_dir, **plot_kwargs)
 
     @abstractmethod
-    def plot_trajectories(self, trajectories: List[List[Transition]], **plot_kwargs):
+    def plot_trajectories(self,
+                          trajectories: List[List[Transition]],
+                          save_dir: str,
+                          **plot_kwargs):
         pass

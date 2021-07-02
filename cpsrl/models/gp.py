@@ -201,7 +201,7 @@ class VFEGP(tf.keras.Model):
 
         # Store log noise parameter for resetting
         self._log_noise = tf.convert_to_tensor(log_noise, dtype=dtype)
-    
+
         # Set log of noise parameter
         self.log_noise = tf.Variable(self._log_noise, trainable=trainable_noise)
         
