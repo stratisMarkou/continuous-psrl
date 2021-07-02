@@ -57,6 +57,7 @@ class MountainCar(Environment):
         # Check if action is in permissible space
         valid_action = [(a1 <= a <= a2)
                         for (a1, a2), a in zip(self.action_space, action)]
+        valid_action = all(valid_action)
 
         if not valid_action:
             raise EnvironmentError(f'Expected action in the space '

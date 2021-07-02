@@ -128,6 +128,7 @@ class GPPSRLAgent(Agent):
 
         # Optimise the policy
         print("\nUpdating policy...")
+        self.policy.reset()
         self.optimise_policy(num_rollouts=self.update_params["num_rollouts"],
                              num_features=self.update_params["num_features"],
                              num_steps=self.update_params["num_steps_policy"],
