@@ -100,14 +100,8 @@ class MountainCar(Environment):
                           trajectories: List[List[Transition]],
                           save_dir: Optional[str] = None,
                           **plot_kwargs):
+
         fig = plt.figure()
-        plot_muted = len(trajectories) > len(color_defaults)  # > 10
-        if plot_muted:
-            colors = [color_defaults[0]] * len(trajectories)
-            alpha = 1 / len(trajectories)
-        else:
-            colors = color_defaults
-            alpha = 1.0
 
         # joint axis
         ax = fig.add_subplot(111)
@@ -115,33 +109,55 @@ class MountainCar(Environment):
         ax.spines['bottom'].set_color('none')
         ax.spines['left'].set_color('none')
         ax.spines['right'].set_color('none')
-        ax.tick_params(labelcolor='w', top=False, bottom=False, left=False, right=False)
+        ax.tick_params(labelcolor='w',
+                       top=False,
+                       bottom=False,
+                       left=False,
+                       right=False)
 
         # position
-        ax1 = fig.add_subplot(311)
+        ax1 = fig.add_subplot(411)
         ax1.set_ylabel("Position")
         plt.setp(ax1.get_xticklabels(), visible=False)
 
         # velocity
-        ax2 = fig.add_subplot(312, sharex=ax1)
+        ax2 = fig.add_subplot(412, sharex=ax1)
         ax2.set_ylabel("Velocity")
         plt.setp(ax2.get_xticklabels(), visible=False)
 
         # action
-        ax3 = fig.add_subplot(313, sharex=ax1)
+        ax3 = fig.add_subplot(413, sharex=ax1)
         ax3.set_ylabel("Action")
+        plt.setp(ax3.get_xticklabels(), visible=False)
+
+        # reward
+        ax4 = fig.add_subplot(414, sharex=ax1)
+        ax4.set_ylabel("Reward")
 
         for i, trajectory in enumerate(trajectories):
-            t = np.arange(len(trajectory))
-            states, actions, _, _ = Transition(*zip(*trajectory))
-            states, actions = np.array(states), np.array(actions)
 
-            ax1.plot(t, states[:, 0], c=colors[i], alpha=alpha)
-            ax2.plot(t, states[:, 1], c=colors[i], alpha=alpha)
-            ax3.plot(t, actions, c=colors[i], alpha=alpha)
+            t = np.arange(len(trajectory))
+            states, actions, rewards, _ = Transition(*zip(*trajectory))
+
+            states = np.array(states)
+            actions = np.array(actions)
+            rewards = np.array(rewards)
+
+            color = color_defaults[0] if i > 3 else color_defaults[1]
+            alpha = min(1., 5. / len(trajectories)) if i > 3 else 1.
+            zorder = 1 if i > 3 else 2
+
+            ax1.plot(t, states[:, 0], c=color, alpha=alpha, zorder=zorder)
+            plt.ylim(-2., 2.)
+            ax2.plot(t, states[:, 1], c=color, alpha=alpha, zorder=zorder)
+            plt.ylim(-2., 2.)
+            ax3.plot(t, actions, c=color, alpha=alpha, zorder=zorder)
+            plt.ylim(-1.5, 1.5)
+            ax4.plot(t, rewards, c=color, alpha=alpha, zorder=zorder)
+            plt.ylim(-2., 2.)
 
         ax.set_xlabel('Time')
-        fig.align_ylabels([ax1, ax2, ax3])
+        fig.align_ylabels([ax1, ax2, ax3, ax4])
 
         if save_dir is not None:
             plt.savefig(save_dir, bbox_inches="tight")

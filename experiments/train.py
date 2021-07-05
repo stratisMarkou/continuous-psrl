@@ -372,7 +372,7 @@ for i in range(args.num_episodes):
         plot_freq = np.maximum(1, len(rollouts) // 10)
         opt_steps = np.arange(len(rollouts))
         for t, rollout in zip(opt_steps[::plot_freq], rollouts[::plot_freq]):
-            plot_file = f"opt_ep-{i}_iter-{t}.jpg"
+            plot_file = f"opt_ep-{i}_iter-{t}.svg"
             save_dir = os.path.join(plot_dir, plot_file)
             env.plot_trajectories(rollout, save_dir=save_dir)
 
