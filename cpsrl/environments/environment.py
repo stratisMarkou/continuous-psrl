@@ -1,11 +1,11 @@
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Callable
 from abc import ABC, abstractmethod
-
-import numpy as np
 
 from cpsrl.agents import Agent
 from cpsrl.train_utils import play_episode
 from cpsrl.helpers import check_shape, Transition
+
+import tensorflow as tf
 
 
 # =============================================================================
@@ -17,11 +17,11 @@ class Environment(ABC):
 
     def __init__(self,
                  horizon: int,
-                 rng: np.random.Generator,
+                 dtype: tf.DType,
                  sub_sampling_factor: int = 1):
 
         self.horizon = horizon
-        self.rng = rng
+        self.dtype = dtype
         self.sub_sampling_factor = sub_sampling_factor
 
         self.timestep = 0
@@ -29,7 +29,7 @@ class Environment(ABC):
         self.reset()
 
     @abstractmethod
-    def reset(self) -> np.ndarray:
+    def reset(self) -> tf.Tensor:
         pass
 
     @property
@@ -45,17 +45,24 @@ class Environment(ABC):
         return self.timestep >= self.horizon
 
     @abstractmethod
-    def step_dynamics(self, state: np.ndarray, action: np.ndarray) -> np.ndarray:
+    def ground_truth_models(self) -> Tuple[Callable, Callable]:
+        pass
+
+    @abstractmethod
+    def step_dynamics(self,
+                      state: tf.Tensor,
+                      action: tf.Tensor) -> tf.Tensor:
         pass
 
     @abstractmethod
     def get_reward(self,
-                   state: np.ndarray,
-                   action: np.ndarray,
-                   next_state: np.ndarray) -> np.ndarray:
+                   state: tf.Tensor,
+                   action: tf.Tensor,
+                   next_state: tf.Tensor) -> tf.Tensor:
         pass
 
-    def step(self, action: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def step(self, action: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
+
         state = self.state
         next_state = None
 
@@ -64,6 +71,10 @@ class Environment(ABC):
             state = next_state
 
         reward = self.get_reward(self.state, action, next_state)
+
+        reward = tf.reshape(reward, (-1,))
+        next_state = tf.reshape(next_state, (-1,))
+
         check_shape(reward, (1,))
 
         self.timestep += 1
@@ -78,7 +89,9 @@ class Environment(ABC):
              **plot_kwargs):
 
         trajectories = []
+
         for _ in range(num_episodes):
+
             _, trajectory = play_episode(agent=agent, environment=self)
             trajectories.append(trajectory)
 
