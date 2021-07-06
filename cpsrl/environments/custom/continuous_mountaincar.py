@@ -64,25 +64,15 @@ class MountainCar(Environment):
         def dynamics_model(state_action, add_noise):
 
             state = state_action[:, :2]
-            # print("State")
-            # print(state)
             action = state_action[:, 2:]
-            # print("Action")
-            # print(action)
             next_state = self.step_dynamics(state, action)
-            # print("Next state")
-            # print(next_state)
-            # input("")
 
             return next_state - state
 
         def rewards_model(state, add_noise):
-            # print("State")
-            # print(state)
+            
             reward = self.get_reward(state, None, None)
-            # print("Reward")
-            # print(reward)
-            # input('')
+            
             return reward
 
         return dynamics_model, rewards_model
