@@ -14,7 +14,7 @@ from cpsrl.models.gp import VFEGP, VFEGPStack
 from cpsrl.models.initial_distributions import IndependentGaussianMAPMean
 from cpsrl.policies.policies import FCNPolicy
 from cpsrl.environments import MountainCar, CartPole
-from cpsrl.train_utils import play_episode, eval_models
+from cpsrl.train_utils import play_episode, eval_models, ground_truth_trajectory
 from cpsrl.helpers import set_seed, Logger
 
 parser = argparse.ArgumentParser()
@@ -406,10 +406,12 @@ for i in range(args.num_episodes):
     info_dict = agent.update()
 
     if args.agent in ["GroundTruth", "GPPSRL"]:
+
         # Analyze optimization
         rollouts = info_dict["rollout"]
         plot_freq = np.maximum(1, len(rollouts) // 10)
         opt_steps = np.arange(len(rollouts))
+
         for t, rollout in zip(opt_steps[::plot_freq], rollouts[::plot_freq]):
             plot_file = f"opt_ep-{i}_iter-{t}.svg"
             save_dir = os.path.join(plot_dir, plot_file)
@@ -418,17 +420,22 @@ for i in range(args.num_episodes):
         # Evaluate model performance
         for on_policy in [True, False]:
 
-            print(f"Evaluating models... (on_policy={on_policy})")
-
             if args.agent == "GPPSRL":
+
+                print(f"Evaluating models... (on_policy={on_policy})")
+
                 eval_models(agent=agent,
                             environment=env,
                             dtype=dtype,
                             num_episodes=10,
                             on_policy=on_policy)
 
-    plot_file = f"exp_ep-{i}.jpg"
-    env.plot_trajectories([episode], save_dir=os.path.join(plot_dir, plot_file))
+    ground_truth = ground_truth_trajectory(agent=agent, environment=env)
+
+    plot_file = f"exp_ep-{i}.svg"
+    env.plot_trajectories([episode],
+                          save_dir=os.path.join(plot_dir, plot_file),
+                          ground_truth=ground_truth)
 
     # Save episode
     with open(os.path.join(args.data_dir, f"{exp_name}_ep-{i}.pkl"),

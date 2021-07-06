@@ -152,7 +152,7 @@ class MountainCar(Environment):
 
     def plot_trajectories(self,
                           trajectories: List[List[Transition]],
-                          ground_truth: bool = False,
+                          ground_truth: List[Transition] = None,
                           save_dir: Optional[str] = None,
                           **plot_kwargs):
 
@@ -198,15 +198,9 @@ class MountainCar(Environment):
             actions = np.array(actions)
             rewards = np.array(rewards)
 
-            if ground_truth:
-                color = color_defaults[2]
-                alpha = 1.0
-                zorder = 3
-
-            else:
-                color = color_defaults[0] if i > 2 else color_defaults[1]
-                alpha = min(1., 5. / len(trajectories)) if i > 2 else 1.
-                zorder = 1 if i > 2 else 2
+            color = color_defaults[0] if i > 2 else color_defaults[1]
+            alpha = min(1., 5. / len(trajectories)) if i > 2 else 1.
+            zorder = 1 if i > 2 else 2
 
             ax1.plot(t, states[:, 0], c=color, alpha=alpha, zorder=zorder)
             ax1.set_ylim(-2., 2.)
@@ -219,6 +213,20 @@ class MountainCar(Environment):
 
             ax4.plot(t, rewards, c=color, alpha=alpha, zorder=zorder)
             ax4.set_ylim(-0.5, 1.5)
+
+        if ground_truth:
+
+            t = np.arange(len(ground_truth))
+            states, actions, rewards, _ = Transition(*zip(*ground_truth))
+
+            color = color_defaults[2]
+            alpha = 1.0
+            zorder = 3
+
+            ax1.plot(t, states[:, 0], c=color, alpha=alpha, zorder=zorder)
+            ax2.plot(t, states[:, 1], c=color, alpha=alpha, zorder=zorder)
+            ax3.plot(t, actions, c=color, alpha=alpha, zorder=zorder)
+            ax4.plot(t, rewards, c=color, alpha=alpha, zorder=zorder)
 
         ax.set_xlabel('Time')
         fig.align_ylabels([ax1, ax2, ax3, ax4])

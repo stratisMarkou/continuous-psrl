@@ -29,6 +29,7 @@ Transition = namedtuple("Transition", ("state", "action", "reward", "next_state"
 # ==============================================================================
 
 def convert_episode_to_tensors(episode: List[Transition], dtype: tf.DType):
+
     episode_sa = []
     episode_sas_ = []
 
@@ -39,8 +40,8 @@ def convert_episode_to_tensors(episode: List[Transition], dtype: tf.DType):
         # Check the shape of the states, actions and rewards
         check_shape([s, a, r, s_,], [('S',), ('A',), (1,), ('S',)])
 
-        episode_sa.append(np.concatenate([s, a]))
-        episode_sas_.append(np.concatenate([s, a, s_]))
+        episode_sa.append(tf.concat([s, a], axis=0))
+        episode_sas_.append(tf.concat([s, a, s_], axis=0))
 
     episode_s = tf.convert_to_tensor(ep.state, dtype=dtype)
     episode_sa = tf.convert_to_tensor(episode_sa, dtype=dtype)
