@@ -3,11 +3,9 @@
 ## Infrastructure notes
 
 Things we would like to add to the codebase:
-* __FIX ACTION BUG__
+* A working version of poolicy gradients using the exact models.
 * Unit tests for initial distribution
-* Ensure prior initial distribution is sensible
 * Add LBFGS optimisation
-* Add interfacing to environment's dynamics and rewards as models for ground truth training/testing
 * Add rng to various classes: models, agents, policy
 * Add oracle agent for low-dimensional environments
 * Agent snapshot saving and loading
