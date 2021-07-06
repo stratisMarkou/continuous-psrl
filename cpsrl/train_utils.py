@@ -108,3 +108,13 @@ def eval_models(agent: GPPSRLAgent,
 
     print(f"Dynamics > SMSE: {dyn_err_mean}, LL: {dyn_ll_mean}")
     print(f"Rewards  > SMSE: {rew_err_mean}, LL: {rew_ll_mean}")
+
+
+def ground_truth_trajectory(agent: GPPSRLAgent, environment: Environment) \
+        -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
+
+    _, episode = play_episode(agent=agent, environment=environment)
+
+    s, sa, s_, _, r = convert_episode_to_tensors(episode, dtype=agent.dtype)
+
+    return s, sa, s_, r

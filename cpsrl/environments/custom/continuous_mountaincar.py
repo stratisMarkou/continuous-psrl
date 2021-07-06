@@ -118,7 +118,7 @@ class MountainCar(Environment):
 
         # Increment velocity by Euler rule and clip
         velocity_ = velocity + \
-                    action * self.power - 0.0025 * np.cos(3 * position)
+                    action * self.power - 0.0025 * tf.cos(3 * position)
 
         next_state = tf.concat([position_, velocity_], axis=1)
 
@@ -152,6 +152,7 @@ class MountainCar(Environment):
 
     def plot_trajectories(self,
                           trajectories: List[List[Transition]],
+                          ground_truth: bool = False,
                           save_dir: Optional[str] = None,
                           **plot_kwargs):
 
@@ -197,9 +198,15 @@ class MountainCar(Environment):
             actions = np.array(actions)
             rewards = np.array(rewards)
 
-            color = color_defaults[0] if i > 2 else color_defaults[1]
-            alpha = min(1., 5. / len(trajectories)) if i > 2 else 1.
-            zorder = 1 if i > 2 else 2
+            if ground_truth:
+                color = color_defaults[2]
+                alpha = 1.0
+                zorder = 3
+
+            else:
+                color = color_defaults[0] if i > 2 else color_defaults[1]
+                alpha = min(1., 5. / len(trajectories)) if i > 2 else 1.
+                zorder = 1 if i > 2 else 2
 
             ax1.plot(t, states[:, 0], c=color, alpha=alpha, zorder=zorder)
             ax1.set_ylim(-2., 2.)
