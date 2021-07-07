@@ -145,6 +145,7 @@ class GPPSRLAgent(Agent):
         )
 
         info_dict.update(pol_dict)
+
         return info_dict
 
     def train_model(self,
@@ -205,6 +206,7 @@ class GPPSRLAgent(Agent):
         print_freq = np.maximum(1, num_steps // 10)
 
         info_dict = {"policy_loss": [], "rollout": []}
+
         for i in range(num_steps):
             with tf.GradientTape() as tape:
 
@@ -313,5 +315,7 @@ class GPPSRLAgent(Agent):
             # Increment cumulative reward and update state
             cumulative_reward = cumulative_reward + (gamma ** i) * r
             s = s_
+
+        rollouts = list(zip(*rollouts))
 
         return cumulative_reward, rollouts

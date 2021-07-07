@@ -7,14 +7,14 @@ import sys
 import numpy as np
 import tensorflow as tf
 
-from cpsrl.agents import RandomAgent, GPPSRLAgent
+from cpsrl.agents import RandomAgent, GroundTruthModelAgent, GPPSRLAgent
 from cpsrl.models.mean import ConstantMean, LinearMean
 from cpsrl.models.covariance import EQ
 from cpsrl.models.gp import VFEGP, VFEGPStack
 from cpsrl.models.initial_distributions import IndependentGaussianMAPMean
 from cpsrl.policies.policies import FCNPolicy
 from cpsrl.environments import MountainCar, CartPole
-from cpsrl.train_utils import play_episode, eval_models
+from cpsrl.train_utils import play_episode, eval_models, ground_truth_trajectory
 from cpsrl.helpers import set_seed, Logger
 
 parser = argparse.ArgumentParser()
@@ -28,8 +28,7 @@ parser.add_argument("env",
 
 parser.add_argument("agent",
                     type=str,
-                    choices=["GPPSRL", "Random"],
-                    default="GPPSRL",
+                    choices=["Random", "GroundTruth", "GPPSRL"],
                     help="Agent name.")
 
 parser.add_argument("num_episodes",
@@ -110,7 +109,7 @@ parser.add_argument("--dyn_log_scale",
 
 parser.add_argument("--dyn_log_noise",
                     type=float,
-                    default=-2.0,
+                    default=-3.0,
                     help="Log noise for dynamics model.")
 
 # Reward model parameters
@@ -146,7 +145,7 @@ parser.add_argument("--rew_log_scale",
 
 parser.add_argument("--rew_log_noise",
                     type=float,
-                    default=-4.0,
+                    default=-3.0,
                     help="Log noise for rewards model.")
 
 # Initial distribution parameters
@@ -157,12 +156,12 @@ parser.add_argument("--init_mu0",
 
 parser.add_argument("--init_alpha0",
                     type=float,
-                    default=100.0,
+                    default=1.0,
                     help="Mean for initial distribution.")
 
 parser.add_argument("--init_beta0",
                     type=float,
-                    default=0.1,
+                    default=0.001,
                     help="Mean for initial distribution.")
 
 # Policy parameters
@@ -237,12 +236,9 @@ print(vars(args))
 env_rng = next(rng_seq)
 
 if args.env == "MountainCar":
-    env = MountainCar(rng=env_rng,
+    env = MountainCar(dtype=dtype,
                       horizon=args.horizon,
                       sub_sampling_factor=args.sub_sampling_factor)
-
-elif args.env == "CartPole":
-    env = CartPole(rng=env_rng)
 
 else:
     raise ValueError(f"Invalid environment: {args.env}")
@@ -251,83 +247,131 @@ else:
 S = len(env.state_space)
 A = len(env.action_space)
 
-# 1. Dynamics models
-dyn_means = [LinearMean(input_dim=S + A,
-                        trainable=args.dyn_trainable_mean,
-                        dtype=dtype)
-             for i in range(S)]
 
-dyn_covs = [EQ(log_coeff=args.dyn_log_coeff,
-               log_scales=(S + A) * [args.dyn_log_scale],
-               trainable=args.dyn_trainable_cov,
-               dtype=dtype)
-            for _ in range(S)]
-
-dyn_vfe_gps = [VFEGP(mean=dyn_means[i],
-                     cov=dyn_covs[i],
-                     input_dim=S + A,
-                     trainable_inducing=args.dyn_trainable_inducing,
-                     log_noise=args.dyn_log_noise,
-                     trainable_noise=args.dyn_trainable_noise,
-                     dtype=dtype,
-                     x_ind=tf.random.uniform(shape=(1, S + A), dtype=dtype),
-                     num_ind=None)
-               for i in range(S)]
-
-dynamics_model = VFEGPStack(vfe_gps=dyn_vfe_gps, dtype=dtype)
-
-# 2. Reward model
-rew_mean = ConstantMean(input_dim=S,
-                        trainable=args.rew_trainable_mean,
-                        dtype=dtype)
-
-rew_cov = EQ(log_coeff=args.rew_log_coeff,
-             log_scales=S * [args.rew_log_scale],
-             trainable=args.rew_trainable_cov,
-             dtype=dtype)
-
-rewards_model = VFEGP(mean=rew_mean,
-                      cov=rew_cov,
-                      input_dim=S,
-                      trainable_inducing=args.rew_trainable_inducing,
-                      log_noise=args.rew_log_noise,
-                      trainable_noise=args.rew_trainable_noise,
-                      dtype=dtype,
-                      x_ind=tf.random.uniform(shape=(1, S), dtype=dtype),
-                      num_ind=None)
-
-policy = FCNPolicy(hidden_sizes=[args.hidden_size] * 2,
-                   state_space=env.state_space,
-                   action_space=env.action_space,
-                   trainable=True,
-                   dtype=dtype)
-
-# 3. Initial distribution
-init_mu0 = args.init_mu0 * tf.ones(shape=(S,), dtype=dtype)
-init_alpha0 = args.init_alpha0 * tf.ones(shape=(S,), dtype=dtype)
-init_beta0 = args.init_beta0 * tf.ones(shape=(S,), dtype=dtype)
-
-initial_distribution = IndependentGaussianMAPMean(state_space=env.state_space,
-                                                  mu0=init_mu0,
-                                                  alpha0=init_alpha0,
-                                                  beta0=init_beta0,
-                                                  trainable=True,
-                                                  dtype=dtype)
-
-update_params = {
-    "num_steps_dyn": args.num_steps_dyn,
-    "learn_rate_dyn": args.learn_rate_dyn,
-    "num_steps_rew": args.num_steps_rew,
-    "learn_rate_rew": args.learn_rate_rew,
-    "num_rollouts": args.num_rollouts,
-    "num_features": args.num_features,
-    "num_steps_policy": args.num_steps_policy,
-    "learn_rate_policy": args.learn_rate_policy,
-}
 
 # Set up agent
 agent_rng = next(rng_seq)
-if args.agent == "GPPSRL":
+
+if args.agent == "Random":
+    agent = RandomAgent(action_space=env.action_space, rng=agent_rng)
+
+elif args.agent == "GroundTruth":
+
+    dynamics_model, rewards_model = env.ground_truth_models()
+
+    policy = FCNPolicy(hidden_sizes=[args.hidden_size] * 2,
+                       state_space=env.state_space,
+                       action_space=env.action_space,
+                       trainable=True,
+                       dtype=dtype)
+
+    # Initial distribution
+    init_mu0 = args.init_mu0 * tf.ones(shape=(S,), dtype=dtype)
+    init_alpha0 = args.init_alpha0 * tf.ones(shape=(S,), dtype=dtype)
+    init_beta0 = args.init_beta0 * tf.ones(shape=(S,), dtype=dtype)
+
+    initial_distribution = IndependentGaussianMAPMean(
+        state_space=env.state_space,
+        mu0=init_mu0,
+        alpha0=init_alpha0,
+        beta0=init_beta0,
+        trainable=True,
+        dtype=dtype)
+
+    update_params = {
+        "num_rollouts": args.num_rollouts,
+        "num_steps_policy": args.num_steps_policy,
+        "learn_rate_policy": args.learn_rate_policy,
+    }
+
+    agent = GroundTruthModelAgent(action_space=env.action_space,
+                                  horizon=env.horizon,
+                                  gamma=args.gamma,
+                                  dtype=dtype,
+                                  policy=policy,
+                                  dynamics_model=dynamics_model,
+                                  rewards_model=rewards_model,
+                                  initial_distribution=initial_distribution,
+                                  update_params=update_params)
+
+elif args.agent == "GPPSRL":
+
+    # Dynamics models
+    dyn_means = [LinearMean(input_dim=S + A,
+                            trainable=args.dyn_trainable_mean,
+                            dtype=dtype)
+                 for i in range(S)]
+
+    dyn_covs = [EQ(log_coeff=args.dyn_log_coeff,
+                   log_scales=(S + A) * [args.dyn_log_scale],
+                   trainable=args.dyn_trainable_cov,
+                   dtype=dtype)
+                for _ in range(S)]
+
+    dyn_vfe_gps = [VFEGP(mean=dyn_means[i],
+                         cov=dyn_covs[i],
+                         input_dim=S + A,
+                         trainable_inducing=args.dyn_trainable_inducing,
+                         log_noise=args.dyn_log_noise,
+                         trainable_noise=args.dyn_trainable_noise,
+                         dtype=dtype,
+                         x_ind=tf.random.uniform(shape=(1, S + A), dtype=dtype),
+                         num_ind=None)
+                   for i in range(S)]
+
+    dynamics_model = VFEGPStack(vfe_gps=dyn_vfe_gps, dtype=dtype)
+
+    # Reward model
+    rew_mean = ConstantMean(input_dim=S,
+                            trainable=args.rew_trainable_mean,
+                            dtype=dtype)
+
+    rew_cov = EQ(log_coeff=args.rew_log_coeff,
+                 log_scales=S * [args.rew_log_scale],
+                 trainable=args.rew_trainable_cov,
+                 dtype=dtype)
+
+    rewards_model = VFEGP(mean=rew_mean,
+                          cov=rew_cov,
+                          input_dim=S,
+                          trainable_inducing=args.rew_trainable_inducing,
+                          log_noise=args.rew_log_noise,
+                          trainable_noise=args.rew_trainable_noise,
+                          dtype=dtype,
+                          x_ind=tf.random.uniform(shape=(1, S), dtype=dtype),
+                          num_ind=None)
+
+    # Policy
+    policy = FCNPolicy(hidden_sizes=[args.hidden_size] * 2,
+                       state_space=env.state_space,
+                       action_space=env.action_space,
+                       trainable=True,
+                       dtype=dtype)
+
+    # Initial distribution
+    init_mu0 = args.init_mu0 * tf.ones(shape=(S,), dtype=dtype)
+    init_alpha0 = args.init_alpha0 * tf.ones(shape=(S,), dtype=dtype)
+    init_beta0 = args.init_beta0 * tf.ones(shape=(S,), dtype=dtype)
+
+    initial_distribution = IndependentGaussianMAPMean(
+        state_space=env.state_space,
+        mu0=init_mu0,
+        alpha0=init_alpha0,
+        beta0=init_beta0,
+        trainable=True,
+        dtype=dtype)
+
+    update_params = {
+        "num_steps_dyn": args.num_steps_dyn,
+        "learn_rate_dyn": args.learn_rate_dyn,
+        "num_steps_rew": args.num_steps_rew,
+        "learn_rate_rew": args.learn_rate_rew,
+        "num_rollouts": args.num_rollouts,
+        "num_features": args.num_features,
+        "num_steps_policy": args.num_steps_policy,
+        "learn_rate_policy": args.learn_rate_policy,
+    }
+
     agent = GPPSRLAgent(action_space=env.action_space,
                         horizon=env.horizon,
                         gamma=args.gamma,
@@ -339,11 +383,6 @@ if args.agent == "GPPSRL":
                         max_ind=args.max_ind,
                         dtype=dtype)
 
-elif args.agent == "Random":
-    agent = RandomAgent(action_space=env.action_space, rng=agent_rng)
-
-else:
-    raise ValueError(f"Invalid agent: {args.agent}")
 
 # =============================================================================
 # Training loop
@@ -366,29 +405,37 @@ for i in range(args.num_episodes):
     # Train agent models and/or policy
     info_dict = agent.update()
 
-    if isinstance(agent, GPPSRLAgent):
+    if args.agent in ["GroundTruth", "GPPSRL"]:
+
         # Analyze optimization
         rollouts = info_dict["rollout"]
         plot_freq = np.maximum(1, len(rollouts) // 10)
         opt_steps = np.arange(len(rollouts))
+
         for t, rollout in zip(opt_steps[::plot_freq], rollouts[::plot_freq]):
-            plot_file = f"opt_ep-{i}_iter-{t}.jpg"
+            plot_file = f"opt_ep-{i}_iter-{t}.svg"
             save_dir = os.path.join(plot_dir, plot_file)
             env.plot_trajectories(rollout, save_dir=save_dir)
 
         # Evaluate model performance
         for on_policy in [True, False]:
 
-            print(f"Evaluating models... (on_policy={on_policy})")
+            if args.agent == "GPPSRL":
 
-            eval_models(agent=agent,
-                        environment=env,
-                        dtype=dtype,
-                        num_episodes=10,
-                        on_policy=on_policy)
+                print(f"Evaluating models... (on_policy={on_policy})")
 
-    plot_file = f"exp_ep-{i}.jpg"
-    env.plot_trajectories([episode], save_dir=os.path.join(plot_dir, plot_file))
+                eval_models(agent=agent,
+                            environment=env,
+                            dtype=dtype,
+                            num_episodes=10,
+                            on_policy=on_policy)
+
+    ground_truth = ground_truth_trajectory(agent=agent, environment=env)
+
+    plot_file = f"exp_ep-{i}.svg"
+    env.plot_trajectories([episode],
+                          save_dir=os.path.join(plot_dir, plot_file),
+                          ground_truth=ground_truth)
 
     # Save episode
     with open(os.path.join(args.data_dir, f"{exp_name}_ep-{i}.pkl"),

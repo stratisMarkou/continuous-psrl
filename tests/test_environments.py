@@ -35,10 +35,7 @@ def test_mountaincar_valid_action():
     # Horizon
     horizon = 100
 
-    # Set up environment
-    env_rng = next(rng_seq)
-
-    env = MountainCar(rng=env_rng, horizon=horizon)
+    env = MountainCar(horizon=horizon, dtype=dtype)
 
     min_action, max_action = env.action_space[0]
 

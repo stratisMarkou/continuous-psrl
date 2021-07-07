@@ -28,7 +28,7 @@ def play_episode(agent: Agent, environment: Environment) \
         action = agent.act(state)
         next_state, reward = environment.step(action)
 
-        cumulative_reward += reward.item()
+        cumulative_reward += reward.numpy().item()
         episode.append(Transition(state, action, reward, next_state))
         state = next_state
 
@@ -41,23 +41,27 @@ def play_random_episode(environment: Environment) \
         -> Tuple[float, List[Transition]]:
     """Plays an episode with random states and actions."""
 
-    def get_random_sample(space):
-        rng = environment.rng
-        return np.array([rng.uniform(low, high) for low, high in space])
+    def get_random_sample(space, dtype):
+        return tf.convert_to_tensor([np.random.uniform(low, high)
+                                     for low, high in space],
+                                    dtype=dtype)
 
     environment.reset()
-    state = environment.state = get_random_sample(environment.state_space)
+    state = environment.state = get_random_sample(environment.state_space,
+                                                  environment.dtype)
 
     cumulative_reward = 0.0
     episode = []
 
     while True:
-        action = get_random_sample(environment.action_space)
+        action = get_random_sample(environment.action_space,
+                                   environment.dtype)
         next_state, reward = environment.step(action)
 
-        cumulative_reward += reward.item()
+        cumulative_reward += reward.numpy().item()
         episode.append(Transition(state, action, reward, next_state))
-        state = environment.state = get_random_sample(environment.state_space)
+        state = environment.state = get_random_sample(environment.state_space,
+                                                      environment.dtype)
 
         if environment.done: break
 
@@ -81,7 +85,9 @@ def eval_models(agent: GPPSRLAgent,
 
     dynamics_errors, rewards_errors = [], []
     dynamics_lls, rewards_lls = [], []
+
     for episode in episodes:
+
         s, sa, s_, _, r = convert_episode_to_tensors(episode, dtype=dtype)
 
         ds = s_ - s
@@ -102,3 +108,13 @@ def eval_models(agent: GPPSRLAgent,
 
     print(f"Dynamics > SMSE: {dyn_err_mean}, LL: {dyn_ll_mean}")
     print(f"Rewards  > SMSE: {rew_err_mean}, LL: {rew_ll_mean}")
+
+
+def ground_truth_trajectory(agent: GPPSRLAgent, environment: Environment) \
+        -> Tuple[tf.Tensor, tf.Tensor, tf.Tensor, tf.Tensor]:
+
+    _, episode = play_episode(agent=agent, environment=environment)
+
+    s, sa, s_, _, r = convert_episode_to_tensors(episode, dtype=agent.dtype)
+
+    return s, sa, s_, r
