@@ -13,8 +13,8 @@ from cpsrl.models.covariance import EQ
 from cpsrl.models.gp import VFEGP, VFEGPStack
 from cpsrl.models.initial_distributions import IndependentGaussianMAPMean
 from cpsrl.policies.policies import FCNPolicy
-from cpsrl.environments import MountainCar, CartPole
-from cpsrl.train_utils import play_episode, eval_models, ground_truth_trajectory
+from cpsrl.environments import MountainCar
+from cpsrl.train_utils import play_episode, eval_models
 from cpsrl.helpers import set_seed, Logger
 
 parser = argparse.ArgumentParser()
@@ -430,7 +430,7 @@ for i in range(args.num_episodes):
                             num_episodes=10,
                             on_policy=on_policy)
 
-    ground_truth = ground_truth_trajectory(agent=agent, environment=env)
+    _, ground_truth = play_episode(agent=agent, environment=env)
 
     plot_file = f"exp_ep-{i}.svg"
     env.plot_trajectories([episode],

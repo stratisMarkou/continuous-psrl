@@ -27,7 +27,6 @@ def test_mountaincar_valid_action():
     seed = 0
 
     tf.random.set_seed(seed)
-    rng_seq = set_seed(seed)
 
     # Data type to use
     dtype = tf.float64
