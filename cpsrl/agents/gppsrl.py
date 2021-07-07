@@ -115,23 +115,28 @@ class GPPSRLAgent(Agent):
         print("Updating dynamics model...")
         self.dynamics_model.reset_inducing(num_ind=num_ind)
         self.dynamics_model.reset_parameters()
-        dyn_dict = self.train_model(self.dynamics_model,
-                                    num_steps=self.update_params["num_steps_dyn"],
-                                    learn_rate=self.update_params["learn_rate_dyn"])
+        dyn_dict = self.train_model(
+            self.dynamics_model,
+            num_steps=self.update_params["num_steps_dyn"],
+            learn_rate=self.update_params["learn_rate_dyn"]
+        )
         info_dict["dynamics"] = dyn_dict
         print(self.dynamics_model.parameter_summary())
 
         print("\nUpdating rewards model...")
         self.rewards_model.reset_inducing(num_ind=num_ind)
         self.rewards_model.reset_parameters()
-        rew_dict = self.train_model(self.rewards_model,
-                                    num_steps=self.update_params["num_steps_rew"],
-                                    learn_rate=self.update_params["learn_rate_rew"])
+        rew_dict = self.train_model(
+            self.rewards_model,
+            num_steps=self.update_params["num_steps_rew"],
+            learn_rate=self.update_params["learn_rate_rew"]
+        )
         info_dict["rewards"] = rew_dict
         print(self.rewards_model.parameter_summary())
 
         # Optimise the policy
         print("\nUpdating policy...")
+        self.policy.reset()
         pol_dict = self.optimise_policy(
             num_rollouts=self.update_params["num_rollouts"],
             num_features=self.update_params["num_features"],

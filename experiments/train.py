@@ -38,8 +38,8 @@ parser.add_argument("num_episodes",
 
 parser.add_argument("--sub_sampling_factor",
                     type=int,
-                    default=3,
-                    help="Sub-samplinf factor of the environment.")
+                    default=6,
+                    help="Sub-sampling factor of the environment.")
 
 parser.add_argument("--seed",
                     type=int,
@@ -100,7 +100,7 @@ parser.add_argument("--dyn_trainable_noise",
 
 parser.add_argument("--dyn_log_coeff",
                     type=float,
-                    default=-1.0,
+                    default=-2.0,
                     help="Log coefficients for dynamics model.")
 
 parser.add_argument("--dyn_log_scale",
