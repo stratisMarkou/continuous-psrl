@@ -204,19 +204,19 @@ class MountainCar(Environment):
             ax4.plot(t, rewards, c=color, alpha=alpha, zorder=zorder)
             ax4.set_ylim(-0.5, 1.5)
 
-        if ground_truth:
-
-            t = np.arange(len(ground_truth))
-            states, actions, rewards, _ = Transition(*zip(*ground_truth))
-
-            color = color_defaults[2]
-            alpha = 1.0
-            zorder = 3
-
-            ax1.plot(t, states[:, 0], c=color, alpha=alpha, zorder=zorder)
-            ax2.plot(t, states[:, 1], c=color, alpha=alpha, zorder=zorder)
-            ax3.plot(t, actions, c=color, alpha=alpha, zorder=zorder)
-            ax4.plot(t, rewards, c=color, alpha=alpha, zorder=zorder)
+        # if ground_truth:
+        #
+        #     t = np.arange(len(ground_truth))
+        #     states, actions, rewards, _ = Transition(*zip(*ground_truth))
+        #
+        #     color = color_defaults[2]
+        #     alpha = 1.0
+        #     zorder = 3
+        #
+        #     ax1.plot(t, states[:, 0], c=color, alpha=alpha, zorder=zorder)
+        #     ax2.plot(t, states[:, 1], c=color, alpha=alpha, zorder=zorder)
+        #     ax3.plot(t, actions, c=color, alpha=alpha, zorder=zorder)
+        #     ax4.plot(t, rewards, c=color, alpha=alpha, zorder=zorder)
 
         ax.set_xlabel('Time')
         fig.align_ylabels([ax1, ax2, ax3, ax4])
