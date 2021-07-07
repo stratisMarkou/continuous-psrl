@@ -123,9 +123,7 @@ class GroundTruthModelAgent(Agent):
         # Set data type
         self.dtype = dtype
 
-    def act(self, state: ArrayOrTensor) -> tf.Tensor:
-
-        state = tf.convert_to_tensor(state, dtype=self.dtype)
+    def act(self, state: tf.Tensor) -> tf.Tensor:
 
         if state.ndim == 1:
             state = tf.expand_dims(state, axis=0)
@@ -219,7 +217,7 @@ class GroundTruthModelAgent(Agent):
                 rewards_model: Callable,
                 horizon: int,
                 s0: tf.Tensor,
-                gamma: float) -> object:
+                gamma: float) -> Tuple[float, List[Transition]]:
 
         # Check discount factor is valid
         if not 0. <= gamma <= 1.:
@@ -263,8 +261,7 @@ class GroundTruthModelAgent(Agent):
             r = tf.squeeze(r, axis=1)
 
             # Store states, actions and rewards
-            rollout = [Transition(*t) for t in
-                       zip(s.numpy(), a.numpy(), r.numpy(), s_.numpy())]
+            rollout = [Transition(*t) for t in zip(s, a, r, s_)]
             rollouts.append(rollout)
 
             # Increment cumulative reward and update state

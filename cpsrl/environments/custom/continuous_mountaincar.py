@@ -63,8 +63,8 @@ class MountainCar(Environment):
 
         def dynamics_model(state_action, add_noise):
 
-            state = state_action[:, :2]
-            action = state_action[:, 2:]
+            state = state_action[:, :self.S]
+            action = state_action[:, self.S:]
             next_state = self.step_dynamics(state, action)
 
             return next_state - state
