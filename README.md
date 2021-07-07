@@ -3,7 +3,7 @@
 ## Infrastructure notes
 
 Things we would like to add to the codebase:
-* A working version of poolicy gradients using the exact models.
+* A working version of policy gradients using the exact models.
 * Unit tests for initial distribution
 * Add LBFGS optimisation
 * Add rng to various classes: models, agents, policy
