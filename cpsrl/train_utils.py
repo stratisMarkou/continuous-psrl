@@ -70,7 +70,6 @@ def play_random_episode(environment: Environment) \
 
 def eval_models(agent: GPPSRLAgent,
                 environment: Environment,
-                dtype: tf.DType,
                 num_episodes: int,
                 on_policy: bool):
 
@@ -88,7 +87,7 @@ def eval_models(agent: GPPSRLAgent,
 
     for episode in episodes:
 
-        s, sa, s_, _, r = convert_episode_to_tensors(episode, dtype=dtype)
+        s, sa, s_, _, r = convert_episode_to_tensors(episode)
 
         ds = s_ - s
         dynamics_error = agent.dynamics_model.smse(sa, ds)
@@ -115,6 +114,6 @@ def ground_truth_trajectory(agent: GPPSRLAgent, environment: Environment) \
 
     _, episode = play_episode(agent=agent, environment=environment)
 
-    s, sa, s_, _, r = convert_episode_to_tensors(episode, dtype=agent.dtype)
+    s, sa, s_, _, r = convert_episode_to_tensors(episode)
 
     return s, sa, s_, r

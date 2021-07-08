@@ -1,5 +1,5 @@
 import warnings
-from typing import Callable, List, Optional
+from typing import Callable
 
 from cpsrl.policies.policies import FCNPolicy
 from cpsrl.agents.agent import Agent
@@ -59,9 +59,7 @@ class GPPSRLAgent(Agent):
         self.dtype = dtype
         self.update_params = update_params
 
-    def act(self, state: ArrayOrTensor) -> tf.Tensor:
-
-        state = tf.convert_to_tensor(state, dtype=self.dtype)
+    def act(self, state: tf.Tensor) -> tf.Tensor:
 
         if state.ndim == 1:
             state = tf.expand_dims(state, axis=0)
@@ -74,8 +72,7 @@ class GPPSRLAgent(Agent):
     def observe(self, episode: List[Transition]):
 
         # Convert episode to tensors, to update the models' training data
-        s, sa, s_, sas_, r = convert_episode_to_tensors(episode,
-                                                        dtype=self.dtype)
+        s, sa, s_, sas_, r = convert_episode_to_tensors(episode)
         
         # Initial states for initial dist. and state differences for dynamics
         s0 = s[0:1]

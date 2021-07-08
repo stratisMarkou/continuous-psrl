@@ -247,13 +247,11 @@ else:
 S = len(env.state_space)
 A = len(env.action_space)
 
-
-
 # Set up agent
 agent_rng = next(rng_seq)
 
 if args.agent == "Random":
-    agent = RandomAgent(action_space=env.action_space, rng=agent_rng)
+    agent = RandomAgent(action_space=env.action_space, dtype=dtype)
 
 elif args.agent == "GroundTruth":
 
@@ -426,7 +424,6 @@ for i in range(args.num_episodes):
 
                 eval_models(agent=agent,
                             environment=env,
-                            dtype=dtype,
                             num_episodes=10,
                             on_policy=on_policy)
 

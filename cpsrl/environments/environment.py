@@ -1,11 +1,11 @@
 from typing import List, Tuple, Callable
 from abc import ABC, abstractmethod
 
+import tensorflow as tf
+
 from cpsrl.agents import Agent
 from cpsrl.train_utils import play_episode
 from cpsrl.helpers import check_shape, Transition
-
-import tensorflow as tf
 
 
 # =============================================================================
@@ -74,8 +74,6 @@ class Environment(ABC):
 
         reward = tf.reshape(reward, (-1,))
         next_state = tf.reshape(next_state, (-1,))
-
-        check_shape(reward, (1,))
 
         self.timestep += 1
         self.state = next_state

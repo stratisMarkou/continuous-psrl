@@ -1,10 +1,9 @@
 from abc import abstractmethod
 from typing import List, Tuple
 
-from cpsrl.helpers import check_shape
-
-import numpy as np
 import tensorflow as tf
+
+from cpsrl.helpers import check_shape
 
 
 # ==============================================================================
@@ -34,6 +33,7 @@ class Policy:
     @abstractmethod
     def reset(self):
         pass
+
 
 # ==============================================================================
 # Random policy

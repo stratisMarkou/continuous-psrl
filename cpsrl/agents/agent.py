@@ -8,8 +8,7 @@ from cpsrl.errors import AgentError
 from cpsrl.helpers import (
     convert_episode_to_tensors,
     check_shape,
-    Transition,
-    ArrayOrTensor
+    Transition
 )
 
 import tensorflow as tf
@@ -32,12 +31,12 @@ class Agent(ABC):
         self.horizon = horizon
 
     @abstractmethod
-    def act(self, state: np.ndarray) -> np.ndarray:
+    def act(self, state: tf.Tensor) -> tf.Tensor:
         """
         Method called when the agent interacts with its environment, which
         produces an *action* given a *state* passed to the agent.
 
-        :param state: np.ndarray repre
+        :param state:
         :return:
         """
         pass
@@ -57,10 +56,10 @@ class Agent(ABC):
         *episode* to the dataset held by the agent.
 
         :param episode: List of Transition each of length 4. Each Transition
-        contains np.ndarrays representing the state s, action a, next state
+        contains tf.Tensors representing the state s, action a, next state
         s_ and reward r of an single interaction, in the format
 
-            episode = [(s, a, s_, r), ..., (s, a, s_, r)].
+            episode = [(s, a, r, s_), ..., (s, a, r, s_)].
 
         :return:
         """
@@ -74,14 +73,15 @@ class Agent(ABC):
 class RandomAgent(Agent):
     def __init__(self,
                  action_space: List[Tuple[float, float]],
-                 rng: np.random.Generator):
+                 dtype: tf.DType):
 
         super().__init__(action_space, gamma=None, horizon=None)
-        self.rng = rng
+        self.dtype = dtype
 
-    def act(self, state: np.ndarray) -> np.ndarray:
-        return np.array([self.rng.uniform(lo, hi)
-                         for lo, hi in self.action_space])
+    def act(self, state: tf.Tensor) -> tf.Tensor:
+        return tf.stack([tf.random.uniform(
+            shape=(), minval=lo, maxval=hi, dtype=self.dtype)
+            for lo, hi in self.action_space])
 
     def observe(self, episode: List[Transition]):
         pass
@@ -136,8 +136,7 @@ class GroundTruthModelAgent(Agent):
     def observe(self, episode: List[Transition]):
 
         # Convert episode to tensors, to update the models' training data
-        s, sa, s_, sas_, r = convert_episode_to_tensors(episode,
-                                                        dtype=self.dtype)
+        s, sa, s_, sas_, r = convert_episode_to_tensors(episode)
         self.initial_distribution.add_training_data(s[0:1])
 
     def update(self, **kwargs) -> Optional[dict]:
@@ -217,7 +216,7 @@ class GroundTruthModelAgent(Agent):
                 rewards_model: Callable,
                 horizon: int,
                 s0: tf.Tensor,
-                gamma: float) -> Tuple[float, List[Transition]]:
+                gamma: float) -> Tuple[tf.Tensor, List[List[Transition]]]:
 
         # Check discount factor is valid
         if not 0. <= gamma <= 1.:

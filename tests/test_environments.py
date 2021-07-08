@@ -1,8 +1,7 @@
-from cpsrl.environments import MountainCar
-from cpsrl.helpers import check_shape, set_seed
-from cpsrl.errors import EnvironmentError
-
 import tensorflow as tf
+
+from cpsrl.environments import MountainCar
+from cpsrl.errors import EnvironmentError
 
 DTYPE = tf.float64
 

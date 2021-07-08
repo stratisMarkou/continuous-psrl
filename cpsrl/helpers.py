@@ -3,7 +3,6 @@ import sys
 import random
 
 from typing import List, Tuple, Sequence, Generator, Union, Optional
-from typing_extensions import Protocol
 from collections import namedtuple
 
 import numpy as np
@@ -15,8 +14,7 @@ from cpsrl.errors import ShapeError
 # Custom types
 # ==============================================================================
 
-ArrayOrTensor = Union[np.ndarray, tf.Tensor]
-ArrayType = Union[ArrayOrTensor, Sequence[ArrayOrTensor]]
+ArrayType = Union[tf.Tensor, Sequence[tf.Tensor]]
 ShapeType = Union[Tuple, Sequence[Tuple]]
 ArrayOrArrayDict = Union[ArrayType, Tuple[ArrayType, dict]]
 VariableOrTensor = Union[tf.Variable, tf.Tensor]
@@ -28,7 +26,7 @@ Transition = namedtuple("Transition", ("state", "action", "reward", "next_state"
 # Helper for converting episode to list of tensors
 # ==============================================================================
 
-def convert_episode_to_tensors(episode: List[Transition], dtype: tf.DType):
+def convert_episode_to_tensors(episode: List[Transition]):
 
     episode_sa = []
     episode_sas_ = []
@@ -56,7 +54,7 @@ def convert_episode_to_tensors(episode: List[Transition], dtype: tf.DType):
 # Permissible space checker
 # ==============================================================================
 
-def check_admissible(array: ArrayOrTensor,
+def check_admissible(array: tf.Tensor,
                      admissible_box: List[Tuple[float, float]]):
     """
     Takes in a one-dimensional array and a list of 2-long tuples representing an
@@ -117,11 +115,11 @@ def check_shape(arrays: ArrayType,
         return _check_shape(arrays, shapes)[0]
 
 
-def _check_shape(array: ArrayOrTensor,
+def _check_shape(array: tf.Tensor,
                  shape: Tuple,
                  shape_dict: Optional[dict] = None,
                  argnum: int = None
-                 ) -> Union[ArrayOrTensor, Tuple[ArrayOrTensor, dict]]:
+                 ) -> Union[tf.Tensor, Tuple[tf.Tensor, dict]]:
     
     array_shape = array.shape
     check_string_names = shape_dict is not None

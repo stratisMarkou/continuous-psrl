@@ -1,11 +1,11 @@
-from cpsrl.models.mean import ConstantMean, LinearMean
-from cpsrl.models.covariance import EQ
-from cpsrl.models.gp import VFEGP, VFEGPStack
-from cpsrl.helpers import check_shape
-from cpsrl.errors import ModelError
-
 import tensorflow as tf
 import numpy as np
+
+from cpsrl.models.mean import ConstantMean, LinearMean
+from cpsrl.models.covariance import EQ
+from cpsrl.models.gp import VFEGP
+from cpsrl.helpers import check_shape
+from cpsrl.errors import ModelError
 
 DTYPE = tf.float64
 
