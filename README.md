@@ -3,6 +3,7 @@
 ## Infrastructure notes
 
 Things we would like to add to the codebase:
+* Add Pendulum and Cartpole eenvironments
 * A working version of policy gradients using the exact models.
 * Unit tests for initial distribution
 * Add LBFGS optimisation
