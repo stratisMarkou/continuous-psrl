@@ -1,15 +1,23 @@
 from __future__ import annotations
 
+import warnings
 from typing import Tuple, List, TYPE_CHECKING
 
 import numpy as np
 import tensorflow as tf
+import gym
+from gym.wrappers.monitoring.video_recorder import VideoRecorder
 
 from cpsrl.helpers import Transition, convert_episode_to_tensors
 
 if TYPE_CHECKING:  # avoid circular imports
     from cpsrl.agents import Agent, GPPSRLAgent
     from cpsrl.environments import Environment
+
+
+GYM_LOOKUP = {
+    "MountainCar": "MountainCar-v0"
+}
 
 # =============================================================================
 # Helper for rollouts
@@ -66,6 +74,23 @@ def play_random_episode(environment: Environment) \
         if environment.done: break
 
     return cumulative_reward, episode
+
+
+def record_episode(env_name: str, episode: List[Transition], save_dir: str):
+    if env_name not in GYM_LOOKUP:
+        warnings.warn(f"Video recording not supported for environment: {env_name}")
+        return
+
+    env = gym.make(GYM_LOOKUP[env_name])
+    vid = VideoRecorder(env=env, path=save_dir)
+
+    env.reset()
+    for transition in episode:
+        env.env.state = transition.state.numpy()
+        vid.capture_frame()
+
+    vid.close()
+    env.close()
 
 
 def eval_models(agent: GPPSRLAgent,
