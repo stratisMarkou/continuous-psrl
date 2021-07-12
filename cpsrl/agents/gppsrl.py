@@ -1,5 +1,5 @@
 import warnings
-from typing import Callable, List, Optional
+from typing import Callable
 
 from cpsrl.policies.policies import FCNPolicy
 from cpsrl.agents.agent import Agent
@@ -59,9 +59,7 @@ class GPPSRLAgent(Agent):
         self.dtype = dtype
         self.update_params = update_params
 
-    def act(self, state: ArrayOrTensor) -> tf.Tensor:
-
-        state = tf.convert_to_tensor(state, dtype=self.dtype)
+    def act(self, state: tf.Tensor) -> tf.Tensor:
 
         if state.ndim == 1:
             state = tf.expand_dims(state, axis=0)
@@ -74,8 +72,7 @@ class GPPSRLAgent(Agent):
     def observe(self, episode: List[Transition]):
 
         # Convert episode to tensors, to update the models' training data
-        s, sa, s_, sas_, r = convert_episode_to_tensors(episode,
-                                                        dtype=self.dtype)
+        s, sa, s_, sas_, r = convert_episode_to_tensors(episode)
         
         # Initial states for initial dist. and state differences for dynamics
         s0 = s[0:1]
@@ -115,23 +112,28 @@ class GPPSRLAgent(Agent):
         print("Updating dynamics model...")
         self.dynamics_model.reset_inducing(num_ind=num_ind)
         self.dynamics_model.reset_parameters()
-        dyn_dict = self.train_model(self.dynamics_model,
-                                    num_steps=self.update_params["num_steps_dyn"],
-                                    learn_rate=self.update_params["learn_rate_dyn"])
+        dyn_dict = self.train_model(
+            self.dynamics_model,
+            num_steps=self.update_params["num_steps_dyn"],
+            learn_rate=self.update_params["learn_rate_dyn"]
+        )
         info_dict["dynamics"] = dyn_dict
         print(self.dynamics_model.parameter_summary())
 
         print("\nUpdating rewards model...")
         self.rewards_model.reset_inducing(num_ind=num_ind)
         self.rewards_model.reset_parameters()
-        rew_dict = self.train_model(self.rewards_model,
-                                    num_steps=self.update_params["num_steps_rew"],
-                                    learn_rate=self.update_params["learn_rate_rew"])
+        rew_dict = self.train_model(
+            self.rewards_model,
+            num_steps=self.update_params["num_steps_rew"],
+            learn_rate=self.update_params["learn_rate_rew"]
+        )
         info_dict["rewards"] = rew_dict
         print(self.rewards_model.parameter_summary())
 
         # Optimise the policy
         print("\nUpdating policy...")
+        self.policy.reset()
         pol_dict = self.optimise_policy(
             num_rollouts=self.update_params["num_rollouts"],
             num_features=self.update_params["num_features"],
@@ -140,6 +142,7 @@ class GPPSRLAgent(Agent):
         )
 
         info_dict.update(pol_dict)
+
         return info_dict
 
     def train_model(self,
@@ -200,6 +203,7 @@ class GPPSRLAgent(Agent):
         print_freq = np.maximum(1, num_steps // 10)
 
         info_dict = {"policy_loss": [], "rollout": []}
+
         for i in range(num_steps):
             with tf.GradientTape() as tape:
 
@@ -308,5 +312,7 @@ class GPPSRLAgent(Agent):
             # Increment cumulative reward and update state
             cumulative_reward = cumulative_reward + (gamma ** i) * r
             s = s_
+
+        rollouts = list(zip(*rollouts))
 
         return cumulative_reward, rollouts

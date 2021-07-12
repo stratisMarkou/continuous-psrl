@@ -2,14 +2,13 @@ from abc import ABC, abstractmethod
 from typing import List, Tuple
 import warnings
 
-from cpsrl.helpers import check_shape
-from cpsrl.errors import InitialDistributionError
-
 import numpy as np
 import tensorflow as tf
 import tensorflow_probability as tfp
-
 tfd = tfp.distributions
+
+from cpsrl.helpers import check_shape
+from cpsrl.errors import InitialDistributionError
 
 
 # ==============================================================================

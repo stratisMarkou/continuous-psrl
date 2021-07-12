@@ -1,10 +1,9 @@
 from abc import abstractmethod
 from typing import List, Tuple
 
-from cpsrl.helpers import check_shape
-
-import numpy as np
 import tensorflow as tf
+
+from cpsrl.helpers import check_shape
 
 
 # ==============================================================================
@@ -34,6 +33,7 @@ class Policy:
     @abstractmethod
     def reset(self):
         pass
+
 
 # ==============================================================================
 # Random policy
@@ -100,13 +100,25 @@ class FCNPolicy(Policy, tf.keras.Model):
         self.b = [tf.Variable(b, trainable=self.trainable) for b in self.b]
 
         # Tensors for scaling the final action, outputed by the policy
-        self.action_ranges = [a2 - a1 for a1, a2 in self.action_space]
+        self.action_ranges = [(a2 - a1) / 2 for a1, a2 in self.action_space]
         self.action_ranges = tf.convert_to_tensor(self.action_ranges)
         self.action_ranges = tf.cast(self.action_ranges, dtype=dtype)
 
         self.action_centers = [0.5 * (a1 + a2) for a1, a2 in self.action_space]
         self.action_centers = tf.convert_to_tensor(self.action_centers)
         self.action_centers = tf.cast(self.action_centers, dtype=dtype)
+
+
+    def reset(self):
+
+        # Create and assign weight and bias tensors
+        for i, (s1, s2) in enumerate(self.sizes):
+
+            W = tf.random.normal(shape=(s1, s2), dtype=self.dtype) / s1 ** 0.5
+            self.W[i].assign(W)
+
+            b = tf.zeros(shape=(1, s2), dtype=self.dtype)
+            self.b[i].assign(b)
 
     def __call__(self, tensor: tf.Tensor) -> tf.Tensor:
 
