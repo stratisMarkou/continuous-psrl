@@ -439,10 +439,14 @@ for i in range(args.num_episodes + 1):
 
     _, ground_truth = play_episode(agent=agent, environment=env)
 
-    video_file = f"exp_ep-{i}.mp4"
-    record_episode(env_name=args.env,
-                   episode=ground_truth,
-                   save_dir=os.path.join(plot_dir, video_file))
+    try:
+        video_file = f"exp_ep-{i}.mp4"
+        record_episode(env_name=args.env,
+                       episode=episode,
+                       save_dir=os.path.join(plot_dir, video_file))
+    except:
+        if i == 0:
+            print(f"Could not render video: {sys.exc_info()[0]}")
 
     plot_file = f"exp_ep-{i}.svg"
     env.plot_trajectories([episode],
