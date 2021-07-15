@@ -15,7 +15,7 @@ from cpsrl.models.gp import VFEGP, VFEGPStack
 from cpsrl.models.initial_distributions import IndependentGaussianMAPMean
 from cpsrl.policies.policies import FCNPolicy
 from cpsrl.environments import MountainCar
-from cpsrl.train_utils import play_episode, eval_models
+from cpsrl.train_utils import play_episode, eval_models, record_episode
 from cpsrl.helpers import set_seed, Logger
 
 parser = argparse.ArgumentParser()
@@ -438,6 +438,11 @@ for i in range(args.num_episodes + 1):
                             on_policy=on_policy)
 
     _, ground_truth = play_episode(agent=agent, environment=env)
+
+    video_file = f"exp_ep-{i}.mp4"
+    record_episode(env_name=args.env,
+                   episode=ground_truth,
+                   save_dir=os.path.join(plot_dir, video_file))
 
     plot_file = f"exp_ep-{i}.svg"
     env.plot_trajectories([episode],
