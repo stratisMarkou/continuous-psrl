@@ -206,6 +206,7 @@ class GroundTruthModelAgent(Agent):
 
             # Compute gradients wrt policy variables and apply gradient step
             gradients = tape.gradient(loss, self.policy.trainable_variables)
+            gradients = [tf.clip_by_norm(g, 2.0) for g in gradients]
             optimizer.apply_gradients(zip(gradients,
                                           self.policy.trainable_variables))
 
