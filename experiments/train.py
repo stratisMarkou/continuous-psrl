@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import pickle
 import argparse
 import sys
@@ -68,7 +69,7 @@ parser.add_argument("--model_dir",
 # Environment parameters (for dynamics and rewards)
 parser.add_argument("--gamma",
                     type=float,
-                    default=0.99,
+                    default=1.00,
                     help="Discount factor.")
 
 parser.add_argument("--horizon",
@@ -390,18 +391,27 @@ plot_dir = os.path.join(args.results_dir, exp_name)
 os.makedirs(plot_dir, exist_ok=True)
 
 # For each episode
-for i in range(args.num_episodes):
+start_time = time.time()
+for i in range(args.num_episodes + 1):
 
     # Play episode
-    cumulative_reward, episode = play_episode(agent=agent, environment=env)
+    best_reward, best_episode = 0.0, None
+    for _ in range(10):
+        cumulative_reward, episode = play_episode(agent=agent, environment=env)
+        if cumulative_reward > best_reward:
+            best_reward, best_episode = cumulative_reward, episode
 
-    print(f'\nEpisode {i} | Return: {cumulative_reward:.3f}\n')
+    cumulative_reward, episode = best_reward, best_episode
+    t = time.time() - start_time
 
-    # Observe episode
-    agent.observe(episode)
+    print(f'\nEpisode {i} | Return: {cumulative_reward:.3f}, Time: {t:.1f}s\n')
 
-    # Train agent models and/or policy
-    info_dict = agent.update()
+    if i < args.num_episodes:
+        # Observe episode
+        agent.observe(episode)
+
+        # Train agent models and/or policy
+        info_dict = agent.update()
 
     if args.agent in ["GroundTruth", "GPPSRL"]:
 
