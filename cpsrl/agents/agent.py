@@ -165,6 +165,7 @@ class GroundTruthModelAgent(Agent):
 
         # Initialise optimiser
         optimizer = tf.optimizers.Adam(learn_rate)
+        # optimizer = tf.optimizers.SGD(learn_rate, momentum=0.9, nesterov=True)
         print_freq = np.maximum(1, num_steps // 10)
 
         info_dict = {"policy_loss": [], "rollout": []}

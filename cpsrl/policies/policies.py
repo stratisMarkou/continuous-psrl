@@ -124,6 +124,7 @@ class FCNPolicy(Policy, tf.keras.Model):
 
         # Check input shape is valid
         check_shape(tensor, (-1, self.S))
+        tensor = tensor * tf.convert_to_tensor([[1, 10]], dtype=self.dtype)
 
         for i, (W, b) in enumerate(zip(self.W, self.b)):
 
